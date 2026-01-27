@@ -10,4 +10,4 @@
 ## Notes
 
 - Totals refresh in the background as you open or close YouTube tabs, and you can click **Refresh totals** to force an update.
-- The extension reads video durations from open pages, and it can fall back to fetching the video page HTML when a tab is unloaded.
+- The extension reads video durations from YouTube pages you already have open.
