@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>YouTube Tab Time Counter</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header>
+        <h1>YouTube Tab Time Counter</h1>
+        <p class="subtitle">Add up total watch time for your open YouTube tabs.</p>
+      </header>
+      <section class="summary">
+        <div>
+          <span class="label">YouTube tabs</span>
+          <span id="tab-count" class="value">0</span>
+        </div>
+        <div>
+          <span class="label">Total duration</span>
+          <span id="total-duration" class="value">0:00</span>
+        </div>
+        <div>
+          <span class="label">Known durations</span>
+          <span id="known-count" class="value">0</span>
+        </div>
+        <div>
+          <span class="label">Unknown durations</span>
+          <span id="unknown-count" class="value">0</span>
+        </div>
+      </section>
+      <button id="refresh" type="button">Refresh totals</button>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
