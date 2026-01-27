@@ -9,5 +9,5 @@
 
 ## Notes
 
-- The popup totals update when you open it or click **Refresh totals**.
+- Totals refresh in the background as you open or close YouTube tabs, and you can click **Refresh totals** to force an update.
 - The extension reads video durations from YouTube pages you already have open.
