@@ -3,14 +3,11 @@
   "name": "YouTube Tab Time Counter",
   "version": "1.0.0",
   "description": "Counts total watch time across open YouTube tabs.",
-  "permissions": ["storage", "tabs"],
+  "permissions": ["tabs"],
   "host_permissions": ["*://*.youtube.com/*", "*://youtu.be/*"],
   "action": {
     "default_title": "YouTube Tab Time Counter",
     "default_popup": "popup.html"
-  },
-  "background": {
-    "service_worker": "background.js"
   },
   "content_scripts": [
     {
