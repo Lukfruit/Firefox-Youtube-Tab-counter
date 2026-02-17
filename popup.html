@@ -1,38 +1,58 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>YouTube Tab Time Counter</title>
-    <link rel="stylesheet" href="popup.css" />
-  </head>
-  <body>
-    <main class="app">
-      <header>
-        <h1>YouTube Tab Time Counter</h1>
-        <p class="subtitle">Add up total watch time for your open YouTube tabs.</p>
-      </header>
-      <section class="summary">
-        <div>
-          <span class="label">YouTube tabs</span>
-          <span id="tab-count" class="value">0</span>
-        </div>
-        <div>
-          <span class="label">Total duration</span>
-          <span id="total-duration" class="value">0:00</span>
-        </div>
-        <div>
-          <span class="label">Known durations</span>
-          <span id="known-count" class="value">0</span>
-        </div>
-        <div>
-          <span class="label">Unknown durations</span>
-          <span id="unknown-count" class="value">0</span>
-        </div>
-      </section>
-      <button id="refresh" type="button">Refresh totals</button>
-      <p id="status" class="status" role="status" aria-live="polite"></p>
-    </main>
-    <script src="popup.js"></script>
-  </body>
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { width: 380px; font-family: 'Segoe UI', sans-serif; padding: 15px; background: #fff; color: #333; }
+    h2 { margin: 0 0 10px 0; font-size: 24px; color: #cc0000; }
+    #status { font-size: 11px; color: #888; margin-bottom: 10px; height: 14px; }
+    
+    .stats-container { 
+      display: grid; 
+      grid-template-columns: 1fr 1fr; 
+      gap: 10px; 
+      background: #f1f1f1; 
+      padding: 12px; 
+      border-radius: 8px; 
+      margin-bottom: 15px;
+      font-size: 13px;
+    }
+    .stat-item { display: flex; justify-content: space-between; }
+    .stat-label { color: #666; }
+    .stat-value { font-weight: bold; }
+
+    .leaderboard-header { 
+      font-weight: bold; 
+      font-size: 14px;
+      border-bottom: 2px solid #eee; 
+      padding-bottom: 5px; 
+      margin-bottom: 10px; 
+    }
+    
+    #master-leaderboard { padding: 0; margin: 0; max-height: 400px; overflow-y: auto; }
+    .entry { display: flex; align-items: center; margin-bottom: 6px; font-size: 13px; }
+    .rank { width: 25px; color: #999; font-size: 11px; }
+    .badge { font-size: 9px; padding: 2px 4px; border-radius: 3px; color: white; margin-right: 8px; min-width: 45px; text-align: center; }
+    
+    button { cursor: pointer; background: #cc0000; color: white; border: none; padding: 10px; border-radius: 4px; font-weight: bold; margin-top: 15px; width: 100%; }
+    button:hover { background: #aa0000; }
+  </style>
+</head>
+<body>
+  <div id="status">Idle</div>
+  <h2><span id="total-duration">0:00</span></h2>
+  
+  <div class="stats-container">
+    <div class="stat-item"><span class="stat-label">Total Tabs:</span> <span class="stat-value" id="tab-count">0</span></div>
+    <div class="stat-item"><span class="stat-label">Channels:</span> <span class="stat-value" id="channel-count">0</span></div>
+    <div class="stat-item"><span class="stat-label">Identified:</span> <span class="stat-value" id="known-count">0</span></div>
+    <div class="stat-item"><span class="stat-label">Unique Tags:</span> <span class="stat-value" id="tag-count-meta">0</span></div>
+    <div class="stat-item"><span class="stat-label">Unknown:</span> <span class="stat-value" id="unknown-count">0</span></div>
+  </div>
+
+  <div class="leaderboard-header">Top Interests (By Time)</div>
+  <ul id="master-leaderboard"></ul>
+
+  <button id="refresh">Refresh & Rescan Tabs</button>
+  <script src="popup.js"></script>
+</body>
 </html>

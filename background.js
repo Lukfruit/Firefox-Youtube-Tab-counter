@@ -1,14 +1,11 @@
 const YOUTUBE_TAB_QUERY = { url: ["*://*.youtube.com/*", "*://youtu.be/*"] };
 let isScanning = false;
 
-// Extract metadata from YouTube's raw HTML
 const fetchMetadataFromUrl = async (url) => {
   try {
     const response = await fetch(url, { credentials: 'omit' });
     if (!response.ok) return null;
     const html = await response.text();
-    
-    // Scrape the JSON config YouTube embeds in the page
     const match = html.match(/var ytInitialPlayerResponse\s*=\s*({.+?});/);
     if (match) {
       const data = JSON.parse(match[1]);
@@ -19,16 +16,8 @@ const fetchMetadataFromUrl = async (url) => {
         tags: details.keywords || []
       };
     }
-  } catch (e) {
-    console.error("Fetch error for:", url, e);
-  }
+  } catch (e) { return null; }
   return null;
-};
-
-const processTab = async (tab) => {
-  if (!tab.url) return null;
-  // Fallback to HTML fetch for metadata (channel/tags) even if tab is open
-  return await fetchMetadataFromUrl(tab.url);
 };
 
 const refreshTotals = async () => {
@@ -37,68 +26,54 @@ const refreshTotals = async () => {
 
   try {
     const tabs = await browser.tabs.query(YOUTUBE_TAB_QUERY);
-    
-    await browser.storage.local.set({ 
-      isScanning: true, 
-      totalToScan: tabs.length, 
-      currentScanned: 0 
-    });
+    await browser.storage.local.set({ isScanning: true, totalToScan: tabs.length, currentScanned: 0 });
 
     let totalSeconds = 0;
-    let knownCount = 0;
-    let unknownCount = 0;
-    let channelSet = new Set();
-    let tagSet = new Set();
+    let combinedStats = {}; // Key will be "Type: Name"
 
     const BATCH_SIZE = 5;
-
     for (let i = 0; i < tabs.length; i += BATCH_SIZE) {
       const batch = tabs.slice(i, i + BATCH_SIZE);
-      const results = await Promise.all(batch.map(processTab));
+      const results = await Promise.all(batch.map(t => fetchMetadataFromUrl(t.url)));
 
       results.forEach(meta => {
         if (meta && meta.duration > 0) {
           totalSeconds += meta.duration;
-          knownCount++;
-          if (meta.channel) channelSet.add(meta.channel);
-          if (meta.tags) meta.tags.forEach(tag => tagSet.add(tag));
-        } else {
-          unknownCount++;
+
+          // Add Channel to combined stats
+          const channelKey = `Channel: ${meta.channel}`;
+          combinedStats[channelKey] = (combinedStats[channelKey] || 0) + meta.duration;
+
+          // Add Tags to combined stats
+          meta.tags.forEach(tag => {
+            const tagKey = `Tag: ${tag}`;
+            combinedStats[tagKey] = (combinedStats[tagKey] || 0) + meta.duration;
+          });
         }
       });
 
-      const current = Math.min(i + BATCH_SIZE, tabs.length);
-      
-      // Update storage so Popup sees live progress
-      await browser.storage.local.set({ 
-        currentScanned: current,
-        youtubeTotals: {
-          totalTabs: tabs.length,
-          knownCount,
-          unknownCount,
-          totalSeconds,
-          uniqueChannels: channelSet.size,
-          uniqueTags: tagSet.size
-        }
-      });
-
-      if (i + BATCH_SIZE < tabs.length) {
-        await new Promise(r => setTimeout(r, 400)); 
-      }
+      await browser.storage.local.set({ currentScanned: Math.min(i + BATCH_SIZE, tabs.length) });
+      if (i + BATCH_SIZE < tabs.length) await new Promise(r => setTimeout(r, 400));
     }
-  } catch (err) {
-    console.error("Scan failed:", err);
-  } finally {
-    isScanning = false;
-    await browser.storage.local.set({ isScanning: false });
-  }
+
+    // Sort the combined list by duration
+    const sortedLeaderboard = Object.entries(combinedStats)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 25) // Get Top 25 combined
+      .map(([label, sec]) => ({ label, duration: sec }));
+
+    await browser.storage.local.set({
+      isScanning: false,
+      youtubeTotals: {
+        totalTabs: tabs.length,
+        totalSeconds,
+        leaderboard: sortedLeaderboard,
+        uniqueChannels: Object.keys(combinedStats).filter(k => k.startsWith("Channel:")).length,
+        uniqueTags: Object.keys(combinedStats).filter(k => k.startsWith("Tag:")).length
+      }
+    });
+  } catch (err) { console.error(err); } finally { isScanning = false; }
 };
 
-browser.runtime.onMessage.addListener((message) => {
-  if (message.type === "forceRefresh") {
-    refreshTotals();
-    return Promise.resolve({ started: true });
-  }
-});
-
+browser.runtime.onMessage.addListener((m) => { if (m.type === "forceRefresh") refreshTotals(); });
 browser.runtime.onInstalled.addListener(refreshTotals);
