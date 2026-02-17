@@ -1,28 +1,34 @@
 const YOUTUBE_TAB_QUERY = { url: ["*://*.youtube.com/*", "*://youtu.be/*"] };
 let isScanning = false;
 
-// Extract duration from YouTube's raw HTML
-const fetchDurationFromUrl = async (url) => {
+// Extract metadata from YouTube's raw HTML
+const fetchMetadataFromUrl = async (url) => {
   try {
     const response = await fetch(url, { credentials: 'omit' });
+    if (!response.ok) return null;
     const html = await response.text();
-    const match = html.match(/"lengthSeconds":"(\d+)"/);
-    return match ? parseInt(match[1], 10) : null;
+    
+    // Scrape the JSON config YouTube embeds in the page
+    const match = html.match(/var ytInitialPlayerResponse\s*=\s*({.+?});/);
+    if (match) {
+      const data = JSON.parse(match[1]);
+      const details = data.videoDetails || {};
+      return {
+        duration: parseInt(details.lengthSeconds, 10) || 0,
+        channel: details.author || "Unknown Channel",
+        tags: details.keywords || []
+      };
+    }
   } catch (e) {
-    return null;
+    console.error("Fetch error for:", url, e);
   }
+  return null;
 };
 
 const processTab = async (tab) => {
   if (!tab.url) return null;
-  // If tab is loaded, try messaging content script
-  if (!tab.discarded && tab.id) {
-    try {
-      const res = await browser.tabs.sendMessage(tab.id, { type: "getDuration" });
-      if (res?.durationSeconds) return res.durationSeconds;
-    } catch (e) { /* ignore and fallback */ }
-  }
-  return await fetchDurationFromUrl(tab.url);
+  // Fallback to HTML fetch for metadata (channel/tags) even if tab is open
+  return await fetchMetadataFromUrl(tab.url);
 };
 
 const refreshTotals = async () => {
@@ -32,32 +38,48 @@ const refreshTotals = async () => {
   try {
     const tabs = await browser.tabs.query(YOUTUBE_TAB_QUERY);
     
-    // Reset state in storage
     await browser.storage.local.set({ 
       isScanning: true, 
       totalToScan: tabs.length, 
-      currentScanned: 0,
-      youtubeTotals: { totalTabs: tabs.length, knownCount: 0, unknownCount: 0, totalSeconds: 0 }
+      currentScanned: 0 
     });
 
-    let totalSeconds = 0, knownCount = 0, unknownCount = 0;
+    let totalSeconds = 0;
+    let knownCount = 0;
+    let unknownCount = 0;
+    let channelSet = new Set();
+    let tagSet = new Set();
+
     const BATCH_SIZE = 5;
 
     for (let i = 0; i < tabs.length; i += BATCH_SIZE) {
       const batch = tabs.slice(i, i + BATCH_SIZE);
-      const durations = await Promise.all(batch.map(processTab));
+      const results = await Promise.all(batch.map(processTab));
 
-      durations.forEach(d => {
-        if (d) { totalSeconds += d; knownCount++; } 
-        else { unknownCount++; }
+      results.forEach(meta => {
+        if (meta && meta.duration > 0) {
+          totalSeconds += meta.duration;
+          knownCount++;
+          if (meta.channel) channelSet.add(meta.channel);
+          if (meta.tags) meta.tags.forEach(tag => tagSet.add(tag));
+        } else {
+          unknownCount++;
+        }
       });
 
       const current = Math.min(i + BATCH_SIZE, tabs.length);
       
-      // Update storage so Popup can see progress
+      // Update storage so Popup sees live progress
       await browser.storage.local.set({ 
         currentScanned: current,
-        youtubeTotals: { totalTabs: tabs.length, knownCount, unknownCount, totalSeconds }
+        youtubeTotals: {
+          totalTabs: tabs.length,
+          knownCount,
+          unknownCount,
+          totalSeconds,
+          uniqueChannels: channelSet.size,
+          uniqueTags: tagSet.size
+        }
       });
 
       if (i + BATCH_SIZE < tabs.length) {
@@ -65,20 +87,18 @@ const refreshTotals = async () => {
       }
     }
   } catch (err) {
-    console.error("Scan error:", err);
+    console.error("Scan failed:", err);
   } finally {
     isScanning = false;
     await browser.storage.local.set({ isScanning: false });
   }
 };
 
-// Start listening for the refresh command
 browser.runtime.onMessage.addListener((message) => {
   if (message.type === "forceRefresh") {
     refreshTotals();
-    return Promise.resolve({ started: true }); // Acknowledge receipt
+    return Promise.resolve({ started: true });
   }
 });
 
-// Auto-run on install
 browser.runtime.onInstalled.addListener(refreshTotals);
