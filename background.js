@@ -3,7 +3,8 @@ let isScanning = false;
 
 const fetchMetadataFromUrl = async (url) => {
   try {
-    const response = await fetch(url, { credentials: 'omit' });
+    // No 'omit' credentials to bypass consent walls for unloaded tabs
+    const response = await fetch(url);
     if (!response.ok) return null;
     const html = await response.text();
     const match = html.match(/var ytInitialPlayerResponse\s*=\s*({.+?});/);
@@ -29,7 +30,8 @@ const refreshTotals = async () => {
     await browser.storage.local.set({ isScanning: true, totalToScan: tabs.length, currentScanned: 0 });
 
     let totalSeconds = 0;
-    let combinedStats = {}; // Key will be "Type: Name"
+    let channelStats = {}; // { name: { duration, count } }
+    let tagStats = {};     // { name: { duration, count, channels: Set() } }
 
     const BATCH_SIZE = 5;
     for (let i = 0; i < tabs.length; i += BATCH_SIZE) {
@@ -39,15 +41,27 @@ const refreshTotals = async () => {
       results.forEach(meta => {
         if (meta && meta.duration > 0) {
           totalSeconds += meta.duration;
+          
+          // 1. Process Channel
+          if (!channelStats[meta.channel]) channelStats[meta.channel] = { duration: 0, count: 0 };
+          channelStats[meta.channel].duration += meta.duration;
+          channelStats[meta.channel].count += 1;
 
-          // Add Channel to combined stats
-          const channelKey = `Channel: ${meta.channel}`;
-          combinedStats[channelKey] = (combinedStats[channelKey] || 0) + meta.duration;
+          const cleanChannel = meta.channel.toLowerCase().replace(/\s+/g, "");
 
-          // Add Tags to combined stats
+          // 2. Process Tags
           meta.tags.forEach(tag => {
-            const tagKey = `Tag: ${tag}`;
-            combinedStats[tagKey] = (combinedStats[tagKey] || 0) + meta.duration;
+            const cleanTag = tag.toLowerCase().replace(/\s+/g, "");
+            
+            // Filter: Skip if tag is just the channel name or system noise
+            if (cleanTag === cleanChannel || cleanTag === "yt:cc=on") return;
+
+            if (!tagStats[tag]) {
+              tagStats[tag] = { duration: 0, count: 0, channels: new Set() };
+            }
+            tagStats[tag].duration += meta.duration;
+            tagStats[tag].count += 1;
+            tagStats[tag].channels.add(meta.channel); // Track which channel used this tag
           });
         }
       });
@@ -56,11 +70,24 @@ const refreshTotals = async () => {
       if (i + BATCH_SIZE < tabs.length) await new Promise(r => setTimeout(r, 400));
     }
 
-    // Sort the combined list by duration
-    const sortedLeaderboard = Object.entries(combinedStats)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 25) // Get Top 25 combined
-      .map(([label, sec]) => ({ label, duration: sec }));
+    // Merge into one Leaderboard with the Cross-Channel Rule
+    let combined = [];
+
+    // Add all Channels
+    Object.entries(channelStats).forEach(([name, stats]) => {
+      combined.push({ label: `Channel: ${name}`, duration: stats.duration, count: stats.count });
+    });
+
+    // Add Tags ONLY if they appear on 2+ different channels
+    Object.entries(tagStats).forEach(([name, stats]) => {
+      if (stats.channels.size >= 2) {
+        combined.push({ label: `Tag: ${name}`, duration: stats.duration, count: stats.count });
+      }
+    });
+
+    const sortedLeaderboard = combined
+      .sort((a, b) => b.duration - a.duration)
+      .slice(0, 25);
 
     await browser.storage.local.set({
       isScanning: false,
@@ -68,8 +95,8 @@ const refreshTotals = async () => {
         totalTabs: tabs.length,
         totalSeconds,
         leaderboard: sortedLeaderboard,
-        uniqueChannels: Object.keys(combinedStats).filter(k => k.startsWith("Channel:")).length,
-        uniqueTags: Object.keys(combinedStats).filter(k => k.startsWith("Tag:")).length
+        uniqueChannels: Object.keys(channelStats).length,
+        uniqueTags: Object.keys(tagStats).length
       }
     });
   } catch (err) { console.error(err); } finally { isScanning = false; }

@@ -23,24 +23,25 @@ const render = (data) => {
     document.getElementById("channel-count").textContent = totals.uniqueChannels || 0;
     document.getElementById("tag-count-meta").textContent = totals.uniqueTags || 0;
     
-    if (totals.leaderboard) {
-      listEl.innerHTML = totals.leaderboard.map((item, index) => {
-        const isChannel = item.label.startsWith("Channel:");
-        const cleanName = item.label.replace(/^(Channel|Tag): /, "");
-        const color = isChannel ? "#e74c3c" : "#3498db";
-        const typeLabel = isChannel ? "CHANNEL" : "TAG";
+	if (totals.leaderboard) {
+	      listEl.innerHTML = totals.leaderboard.map((item, index) => {
+	        const isChannel = item.label.startsWith("Channel:");
+	        const cleanName = item.label.replace(/^(Channel|Tag): /, "");
+	        const color = isChannel ? "#e74c3c" : "#3498db";
+	        const typeLabel = isChannel ? "CHANNEL" : "TAG";
 
-        return `
-          <li class="entry">
-            <span class="rank">${index + 1}.</span>
-            <span class="badge" style="background: ${color}">${typeLabel}</span>
-            <div style="flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 10px;">
-              <strong>${cleanName}</strong>
-            </div>
-            <span style="color: #666; font-size: 12px;">${formatDuration(item.duration)}</span>
-          </li>`;
-      }).join('');
-    }
+	        return `
+	          <li class="entry">
+	            <span class="rank">${index + 1}.</span>
+	            <span class="badge" style="background: ${color}">${typeLabel}</span>
+	            <div style="flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 10px;">
+	              <strong>${cleanName}</strong> 
+	              <span style="color:#aaa; font-size:10px;">(${item.count}x)</span>
+	            </div>
+	            <span style="color: #666; font-size: 12px;">${formatDuration(item.duration)}</span>
+	          </li>`;
+	      }).join('');
+	    }
   }
 };
 
