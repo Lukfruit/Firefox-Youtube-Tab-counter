@@ -23,25 +23,61 @@ const render = (data) => {
     document.getElementById("channel-count").textContent = totals.uniqueChannels || 0;
     document.getElementById("tag-count-meta").textContent = totals.uniqueTags || 0;
     
-	if (totals.leaderboard) {
-	      listEl.innerHTML = totals.leaderboard.map((item, index) => {
-	        const isChannel = item.label.startsWith("Channel:");
-	        const cleanName = item.label.replace(/^(Channel|Tag): /, "");
-	        const color = isChannel ? "#e74c3c" : "#3498db";
-	        const typeLabel = isChannel ? "CHANNEL" : "TAG";
+    if (totals.leaderboard) {
+      // 1. Safely clear the list before re-rendering
+      while (listEl.firstChild) {
+        listEl.removeChild(listEl.firstChild);
+      }
 
-	        return `
-	          <li class="entry">
-	            <span class="rank">${index + 1}.</span>
-	            <span class="badge" style="background: ${color}">${typeLabel}</span>
-	            <div style="flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 10px;">
-	              <strong>${cleanName}</strong> 
-	              <span style="color:#aaa; font-size:10px;">(${item.count}x)</span>
-	            </div>
-	            <span style="color: #666; font-size: 12px;">${formatDuration(item.duration)}</span>
-	          </li>`;
-	      }).join('');
-	    }
+      // 2. Build each list item using safe DOM methods
+      totals.leaderboard.forEach((item, index) => {
+        const isChannel = item.label.startsWith("Channel:");
+        const cleanName = item.label.replace(/^(Channel|Tag): /, "");
+        const color = isChannel ? "#e74c3c" : "#3498db";
+        const typeLabel = isChannel ? "CHANNEL" : "TAG";
+
+        const li = document.createElement("li");
+        li.className = "entry";
+
+        const rank = document.createElement("span");
+        rank.className = "rank";
+        rank.textContent = `${index + 1}.`;
+        li.appendChild(rank);
+
+        const badge = document.createElement("span");
+        badge.className = "badge";
+        badge.style.backgroundColor = color;
+        badge.textContent = typeLabel;
+        li.appendChild(badge);
+
+        const infoWrapper = document.createElement("div");
+        infoWrapper.style.flexGrow = "1";
+        infoWrapper.style.whiteSpace = "nowrap";
+        infoWrapper.style.overflow = "hidden";
+        infoWrapper.style.textOverflow = "ellipsis";
+        infoWrapper.style.marginRight = "10px";
+
+        const name = document.createElement("strong");
+        name.textContent = cleanName; // Safe text insertion
+        infoWrapper.appendChild(name);
+
+        const count = document.createElement("span");
+        count.style.color = "#aaa";
+        count.style.fontSize = "10px";
+        count.textContent = ` (${item.count}x)`;
+        infoWrapper.appendChild(count);
+
+        li.appendChild(infoWrapper);
+
+        const duration = document.createElement("span");
+        duration.style.color = "#666";
+        duration.style.fontSize = "12px";
+        duration.textContent = formatDuration(item.duration);
+        li.appendChild(duration);
+
+        listEl.appendChild(li);
+      });
+    }
   }
 };
 

@@ -1,71 +1,117 @@
+/* popup.css - Dark Mode for YouTube Analyzer */
 :root {
-  color-scheme: light dark;
-  font-family: "Segoe UI", system-ui, sans-serif;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  color-scheme: dark;
 }
 
 body {
+  width: 380px;
+  padding: 15px;
+  background: #111827; /* Dark background */
+  color: #f9fafb;      /* Light text */
   margin: 0;
-  min-width: 260px;
-  background: #111827;
-  color: #f9fafb;
 }
 
-.app {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 16px;
+h2 {
+  margin: 0 0 10px 0;
+  font-size: 24px;
+  color: #f87171; /* Softer Red for Dark Mode */
 }
 
-h1 {
-  font-size: 16px;
-  margin: 0 0 4px;
-}
-
-.subtitle {
-  margin: 0;
-  font-size: 12px;
+#status {
+  font-size: 11px;
   color: #9ca3af;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.summary {
+.stats-container {
   display: grid;
-  gap: 12px;
-  background: #1f2937;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  background: #1f2937; /* Darker container */
   padding: 12px;
   border-radius: 8px;
+  margin-bottom: 15px;
+  font-size: 13px;
+  border: 1px solid #374151;
 }
 
-.summary div {
+.stat-item {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
 }
 
-.label {
-  color: #9ca3af;
+.stat-label {
+  color: #9ca3af; /* Grey text */
 }
 
-.value {
+.stat-value {
   font-weight: 600;
+  color: #fff;
+}
+
+.leaderboard-header {
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 1px solid #374151;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+  color: #e5e7eb;
+}
+
+#master-leaderboard {
+  padding: 0;
+  margin: 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 13px;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.entry:hover {
+  background: #374151;
+}
+
+.rank {
+  width: 25px;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+/* Badges for tags */
+.badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: white;
+  margin-right: 8px;
+  min-width: 50px;
+  text-align: center;
+  background: #4b5563; /* Default grey badge */
 }
 
 button {
-  background: #f97316;
-  color: #111827;
+  cursor: pointer;
+  background: #dc2626; /* YouTube Red */
+  color: white;
   border: none;
-  padding: 8px 12px;
+  padding: 10px;
   border-radius: 6px;
   font-weight: 600;
-  cursor: pointer;
+  margin-top: 15px;
+  width: 100%;
+  transition: background 0.2s;
 }
 
-button:active {
-  transform: translateY(1px);
-}
-
-.status {
-  margin: 0;
-  font-size: 12px;
-  color: #a1a1aa;
+button:hover {
+  background: #b91c1c;
 }

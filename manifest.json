@@ -1,21 +1,37 @@
 {
-  "manifest_version": 3,
-  "name": "YouTube Tab Time Counter",
-  "version": "1.0.3",
-  "description": "Counts total watch time across open YouTube tabs.",
-  "permissions": ["tabs", "storage"],
-  "host_permissions": ["*://*.youtube.com/*", "*://youtu.be/*"],
-  "action": {
-    "default_title": "YouTube Tab Time Counter",
-    "default_popup": "popup.html"
+  "manifest_version": 2,
+  "name": "YouTube Tab Analyzer",
+  "version": "1.0",
+  "description": "Analyzes YouTube tabs to track interests and watch time.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "tab-analyzer@lukfruit",
+      "strict_min_version": "142.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
+  "icons": {
+    "128": "icon.svg"
+  },
+  "browser_action": {
+    "default_icon": "icon.svg",
+    "default_popup": "popup.html",
+    "default_title": "YouTube Tab Analyzer"
   },
   "background": {
     "scripts": ["background.js"]
   },
   "content_scripts": [
     {
-      "matches": ["*://*.youtube.com/watch*", "*://*.youtube.com/shorts/*", "*://youtu.be/*"],
+      "matches": ["*://*.youtube.com/*"],
       "js": ["content.js"]
     }
+  ],
+  "permissions": [
+    "tabs",
+    "storage",
+    "https://*.youtube.com/*"
   ]
 }
