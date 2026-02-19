@@ -18,10 +18,7 @@
     "default_popup": "popup.html",
 	"default_title": "YouTube Tab Analyzer"
   },
-  "background": { "scripts": ["background.js"] },
-  "content_scripts": [{
-    "matches": ["*://*.youtube.com/*"],
-    "js": ["content.js"]
-  }],
+  "background": { "scripts": ["utils.js", "processor.js", "background.js"] },
+  "content_scripts": [{ "js": ["utils.js", "content.js"], "matches": ["*://*.youtube.com/*"] }],
   "permissions": ["tabs", "storage", "https://*.youtube.com/*"]
 }
