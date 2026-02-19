@@ -3,6 +3,11 @@ const YOUTUBE_TAB_QUERY = { url: ["*://*.youtube.com/*", "*://youtu.be/*"] };
 let isScanning = false;
 let tabMap = {}; // Persistent memory: { tabId: { duration, channel, tags, title } }
 
+// Load existing map on startup to prevent "stale" leaderboard
+browser.storage.local.get("tabMap").then(res => {
+  if (res.tabMap) tabMap = res.tabMap;
+});
+
 //Batching refresh logic, modified to update tabMap
 const refreshTotals = async () => {
   if (isScanning) return;
@@ -57,12 +62,25 @@ browser.runtime.onMessage.addListener((m, sender) => {
   if (m.type === "forceRefresh") refreshTotals(); 
   if (m.type === "tabUpdate" && sender.tab) {
 	  const existing = tabMap[sender.tab.id];
-	      tabMap[sender.tab.id] = { 
-	          duration: m.data.duration, 
-	          channel: m.data.channel, 
-	          title: m.data.title, 
-	          tags: existing?.tags || [] // Content scripts don't easily see tags, background fetch handles this best
+	  const newEntry = { 
+	        duration: m.data.duration, 
+	        channel: m.data.channel, 
+	        title: m.data.title, 
+	        tags: existing?.tags || [] 
 	      };
+    
+	      tabMap[sender.tab.id] = newEntry;
+
+	      // Trigger an immediate background fetch for tags if we don't have them
+	      if (newEntry.tags.length === 0) {
+	        fetchMetadataFromUrl(sender.tab.url).then(meta => {
+	          if (meta && tabMap[sender.tab.id]) {
+	            tabMap[sender.tab.id].tags = meta.tags;
+	            processAndSaveStats(tabMap);
+	          }
+	        });
+	      }
+		  
 	      processAndSaveStats(tabMap);
   }
 });

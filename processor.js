@@ -28,14 +28,23 @@ const fetchMetadataFromUrl = async (url) => {
 const processAndSaveStats = async (tabMap) => {
   const entries = Object.values(tabMap);
   let totalSeconds = 0;
+  let knownCount = 0;
+  let unknownCount = 0;
   let channelStats = {}; 
   let tagStats = {};     
 
   entries.forEach(meta => {
     if (meta && meta.duration > 0) {
       totalSeconds += meta.duration;
+	  
 	  //If channel is missing or just whitespace, use "Unknown Channel"
       const ch = (meta.channel && meta.channel.trim()) ? meta.channel.trim() : "Unknown Channel";
+	  
+	  if (ch === "Unknown Channel") {
+	    unknownCount++;
+	  } else {
+	    knownCount++;
+	  }
       
       if (!channelStats[ch]) channelStats[ch] = { duration: 0, count: 0 };
       channelStats[ch].duration += meta.duration;
@@ -43,15 +52,16 @@ const processAndSaveStats = async (tabMap) => {
 
       const cleanChannel = ch.toLowerCase().replace(/\s+/g, "");
 	  const cleanTitle = (meta.title || "").toLowerCase().replace(/\s+/g, "");
+	  
 	  (meta.tags || []).forEach(tag => {
-	          const cleanTag = tag.toLowerCase().replace(/\s+/g, "");
+	    const cleanTag = tag.toLowerCase().replace(/\s+/g, "");
         
-	          // Skip if tag is just the channel name, "cc", or the video title itself
-	          if (cleanTag === cleanChannel || cleanTag === "yt:cc=on" || cleanTag === cleanTitle) return;
+	    // Skip if tag is just the channel name, "cc", or the video title itself
+	    if (cleanTag === cleanChannel || cleanTag === "yt:cc=on" || cleanTag === cleanTitle) return;
         
-	          if (!tagStats[tag]) {
-	            tagStats[tag] = { duration: 0, count: 0, channels: new Set() };
-	          }
+	    if (!tagStats[tag]) {
+	      tagStats[tag] = { duration: 0, count: 0, channels: new Set() };
+	    }
         tagStats[tag].duration += meta.duration;
         tagStats[tag].count += 1;
         tagStats[tag].channels.add(ch);
@@ -75,7 +85,9 @@ const processAndSaveStats = async (tabMap) => {
     isScanning: false,
     youtubeTotals: {
       totalTabs: entries.length,
-      totalSeconds,
+	  totalSeconds,
+      knownCount,
+      unknownCount,
       leaderboard: leaderboard.sort((a, b) => b.duration - a.duration).slice(0, 25),
       uniqueChannels: Object.keys(channelStats).length,
       uniqueTags: Object.keys(tagStats).length
