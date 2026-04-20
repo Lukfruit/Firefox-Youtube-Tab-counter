@@ -34,12 +34,13 @@ const refreshTotals = async () => {
       const batch = tabs.slice(i, i + BATCH_SIZE);
       
       await Promise.all(batch.map(async (t) => {
+        console.log("Processing tab:", t.id, t.url);
         let meta = null;
         let tabData = { 
           duration: 0, 
           channel: "Unknown Channel", 
           title: t.title, 
-          tags: [],
+          tags: tabMap[t.id]?.tags || [], // Preserve existing tags
           sessionTime: tabMap[t.id]?.sessionTime || 0,
           watchTime: tabMap[t.id]?.watchTime || 0
         };
@@ -51,12 +52,15 @@ const refreshTotals = async () => {
             tabData.duration = res.durationSeconds;
             tabData.channel = res.channel;
           }
-        } catch (e) { /* Tab might be asleep */ }
+        } catch (e) { 
+          console.log("Tab", t.id, "is likely asleep or content script not ready");
+        }
 
         // ALWAYS do the background fetch for tags and to verify the channel name
         meta = await fetchMetadataFromUrl(t.url);
         if (meta) {
           tabData.tags = meta.tags;
+          console.log("Updated tags for tab", t.id, ":", meta.tags.length);
           // Priority: If background fetch found a name, use it over the content script's guess
           if (meta.channel && meta.channel !== "Unknown Channel") {
             tabData.channel = meta.channel;
@@ -70,6 +74,7 @@ const refreshTotals = async () => {
       await browser.storage.local.set({ currentScanned: Math.min(i + BATCH_SIZE, tabs.length) });
     }
     
+    console.log("Scanning complete. Processing stats for", Object.keys(tabMap).length, "tabs");
     await processAndSaveStats(tabMap);
   } finally {
     isScanning = false;
@@ -153,5 +158,11 @@ browser.tabs.onRemoved.addListener(async (tabId) => {
   }
 });
 
-browser.runtime.onInstalled.addListener(refreshTotals);
-browser.runtime.onStartup.addListener(refreshTotals);
+browser.runtime.onInstalled.addListener(() => {
+  console.log("Extension installed/updated. Triggering initial scan...");
+  refreshTotals();
+});
+browser.runtime.onStartup.addListener(() => {
+  console.log("Browser startup. Triggering initial scan...");
+  refreshTotals();
+});
