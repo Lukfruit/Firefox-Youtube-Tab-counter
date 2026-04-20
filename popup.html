@@ -5,21 +5,48 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div id="status">Idle</div>
-  <h2><span id="total-duration">0:00</span></h2>
-  
-  <div class="stats-container">
-    <div class="stat-item"><span class="stat-label">Total Tabs:</span> <span class="stat-value" id="tab-count">0</span></div>
-    <div class="stat-item"><span class="stat-label">Channels:</span> <span class="stat-value" id="channel-count">0</span></div>
-    <div class="stat-item"><span class="stat-label">Identified:</span> <span class="stat-value" id="known-count">0</span></div>
-    <div class="stat-item"><span class="stat-label">Unique Tags:</span> <span class="stat-value" id="tag-count-meta">0</span></div>
-    <div class="stat-item"><span class="stat-label">Unknown:</span> <span class="stat-value" id="unknown-count">0</span></div>
+  <div class="tabs">
+    <button id="tab-live" class="tab-btn active">Live Now</button>
+    <button id="tab-trends" class="tab-btn">Trends & History</button>
   </div>
 
-  <div class="leaderboard-header">Top Interests (By Time)</div>
-  <ul id="master-leaderboard"></ul>
+  <div id="view-live" class="view">
+    <div id="status">Idle</div>
+    <h2><span id="total-duration">0:00</span></h2>
+    
+    <div class="stats-container">
+      <div class="stat-item"><span class="stat-label">Total Tabs:</span> <span class="stat-value" id="tab-count">0</span></div>
+      <div class="stat-item"><span class="stat-label">Channels:</span> <span class="stat-value" id="channel-count">0</span></div>
+      <div class="stat-item"><span class="stat-label">Identified:</span> <span class="stat-value" id="known-count">0</span></div>
+      <div class="stat-item"><span class="stat-label">Unique Tags:</span> <span class="stat-value" id="tag-count-meta">0</span></div>
+      <div class="stat-item"><span class="stat-label">Unknown:</span> <span class="stat-value" id="unknown-count">0</span></div>
+    </div>
 
-  <button id="refresh">Refresh & Rescan Tabs</button>
+    <div class="leaderboard-header">Top Open Tabs (By Duration)</div>
+    <ul id="live-leaderboard" class="leaderboard"></ul>
+    <button id="refresh">Refresh & Rescan Tabs</button>
+  </div>
+
+  <div id="view-trends" class="view" style="display: none;">
+    <div class="chart-container">
+      <canvas id="historyChart"></canvas>
+    </div>
+    
+    <div class="stats-container">
+      <div class="stat-item"><span class="stat-label">Watch Time:</span> <span class="stat-value" id="history-watch">0:00</span></div>
+      <div class="stat-item"><span class="stat-label">Site Time:</span> <span class="stat-value" id="history-session">0:00</span></div>
+    </div>
+
+    <div class="leaderboard-header">Historical Interests (By Watch Time)</div>
+    <ul id="history-leaderboard" class="leaderboard"></ul>
+    
+    <div class="storage-info">
+      Database: <span id="storage-size">0.0</span> KB
+      <a href="#" id="clear-history" style="color: #e74c3c; margin-left: 10px;">Clear All</a>
+    </div>
+  </div>
+
+  <script src="libs/chart.min.js"></script>
   <script src="utils.js"></script>
   <script src="popup.js"></script>
 </body>

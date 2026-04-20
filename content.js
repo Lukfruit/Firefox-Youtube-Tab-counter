@@ -49,6 +49,23 @@ const sendUpdate = () => {
   }
 };
 
+// Heartbeat system: Sends status every 5s to track active time
+setInterval(() => {
+  const video = document.querySelector("video");
+  const isPlaying = video && !video.paused && !video.ended && video.readyState > 2;
+  
+  browser.runtime.sendMessage({
+    type: "heartbeat",
+    data: {
+      isPlaying: isPlaying,
+      title: document.title, // Keep title updated for background tracking
+      url: window.location.href
+    }
+  }).catch(() => {
+    // Background script might be reloaded or unavailable
+  });
+}, 5000);
+
 // 1. Send update when the page finishes loading
 if (document.readyState === 'complete') {
   sendUpdate();

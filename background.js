@@ -1,12 +1,25 @@
 // background.js
 const YOUTUBE_TAB_QUERY = { url: ["*://*.youtube.com/*", "*://youtu.be/*"] };
+const HEARTBEAT_INTERVAL = 5; // seconds
 let isScanning = false;
-let tabMap = {}; // Persistent memory: { tabId: { duration, channel, tags, title } }
+let tabMap = {}; // Persistent memory: { tabId: { duration, channel, tags, title, sessionTime, watchTime } }
 
 // Load existing map on startup to prevent "stale" leaderboard
 browser.storage.local.get("tabMap").then(res => {
   if (res.tabMap) tabMap = res.tabMap;
 });
+
+// Helper to check if a tab is the active one in the focused window
+const isTabActiveAndFocused = async (tabId, windowId) => {
+  try {
+    const window = await browser.windows.get(windowId);
+    if (!window.focused) return false;
+    const [activeTab] = await browser.tabs.query({ active: true, windowId: windowId });
+    return activeTab && activeTab.id === tabId;
+  } catch (e) {
+    return false;
+  }
+};
 
 //Batching refresh logic, modified to update tabMap
 const refreshTotals = async () => {
@@ -22,7 +35,14 @@ const refreshTotals = async () => {
       
       await Promise.all(batch.map(async (t) => {
         let meta = null;
-        let tabData = { duration: 0, channel: "Unknown Channel", title: t.title, tags: [] };
+        let tabData = { 
+          duration: 0, 
+          channel: "Unknown Channel", 
+          title: t.title, 
+          tags: [],
+          sessionTime: tabMap[t.id]?.sessionTime || 0,
+          watchTime: tabMap[t.id]?.watchTime || 0
+        };
 
         try {
           // Try getting live data from the tab first
@@ -58,15 +78,41 @@ const refreshTotals = async () => {
 };
 
 // LISTENERS
-browser.runtime.onMessage.addListener((m, sender) => { 
+browser.runtime.onMessage.addListener(async (m, sender) => { 
   if (m.type === "forceRefresh") refreshTotals(); 
+  
+  if (m.type === "heartbeat" && sender.tab) {
+    const tabId = sender.tab.id;
+    if (!tabMap[tabId]) {
+      tabMap[tabId] = { 
+        duration: 0, 
+        channel: "Unknown Channel", 
+        title: m.data.title, 
+        tags: [], 
+        sessionTime: 0, 
+        watchTime: 0 
+      };
+    }
+
+    const isActive = await isTabActiveAndFocused(tabId, sender.tab.windowId);
+    if (isActive) {
+      tabMap[tabId].sessionTime += HEARTBEAT_INTERVAL;
+      if (m.data.isPlaying) {
+        tabMap[tabId].watchTime += HEARTBEAT_INTERVAL;
+      }
+      processAndSaveStats(tabMap);
+    }
+  }
+
   if (m.type === "tabUpdate" && sender.tab) {
 	  const existing = tabMap[sender.tab.id];
 	  const newEntry = { 
 	        duration: m.data.duration, 
 	        channel: m.data.channel, 
 	        title: m.data.title, 
-	        tags: existing?.tags || [] 
+	        tags: existing?.tags || [],
+          sessionTime: existing?.sessionTime || 0,
+          watchTime: existing?.watchTime || 0
 	      };
     
 	      tabMap[sender.tab.id] = newEntry;
@@ -86,8 +132,22 @@ browser.runtime.onMessage.addListener((m, sender) => {
 });
 
 // Instant cleanup on close
-browser.tabs.onRemoved.addListener((tabId) => {
+browser.tabs.onRemoved.addListener(async (tabId) => {
   if (tabMap[tabId]) {
+    const closedTabData = {
+      ...tabMap[tabId],
+      timestamp: Date.now()
+    };
+
+    try {
+      const res = await browser.storage.local.get("historyLog");
+      const historyLog = res.historyLog || [];
+      historyLog.push(closedTabData);
+      await browser.storage.local.set({ historyLog });
+    } catch (e) {
+      console.error("Failed to save history:", e);
+    }
+
     delete tabMap[tabId];
     processAndSaveStats(tabMap);
   }
