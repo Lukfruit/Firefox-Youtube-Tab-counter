@@ -1,4 +1,5 @@
 let chartInstance = null;
+let currentRange = 7;
 
 const renderLeaderboard = (listEl, items) => {
   while (listEl.firstChild) {
@@ -61,9 +62,12 @@ const renderLeaderboard = (listEl, items) => {
 const updateChart = (histogramData) => {
   const ctx = document.getElementById('historyChart').getContext('2d');
   
-  const labels = Object.keys(histogramData).sort();
-  const sessionData = labels.map(l => histogramData[l].sessionTime / 60); // min
-  const watchData = labels.map(l => histogramData[l].watchTime / 60); // min
+  // Sort dates descending and take only the latest N days based on currentRange
+  const sortedDates = Object.keys(histogramData).sort().reverse();
+  const filteredLabels = sortedDates.slice(0, currentRange).reverse();
+  
+  const sessionData = filteredLabels.map(l => (histogramData[l]?.sessionTime || 0) / 60); // min
+  const watchData = filteredLabels.map(l => (histogramData[l]?.watchTime || 0) / 60); // min
 
   if (chartInstance) {
     chartInstance.destroy();
@@ -72,7 +76,7 @@ const updateChart = (histogramData) => {
   chartInstance = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: labels.map(l => l.split('-').slice(1).join('/')), // MM/DD
+      labels: filteredLabels.map(l => l.split('-').slice(1).join('/')), // MM/DD
       datasets: [
         {
           label: 'Watch Time (min)',
@@ -171,6 +175,25 @@ document.getElementById("tab-trends").addEventListener("click", () => {
   document.getElementById("tab-live").classList.remove("active");
   document.getElementById("view-trends").style.display = "flex";
   document.getElementById("view-live").style.display = "none";
+});
+
+// RANGE SWITCHING
+document.getElementById("range-7").addEventListener("click", () => {
+  currentRange = 7;
+  document.getElementById("range-7").classList.add("active");
+  document.getElementById("range-30").classList.remove("active");
+  browser.storage.local.get("histogramData").then(data => {
+    if (data.histogramData) updateChart(data.histogramData);
+  });
+});
+
+document.getElementById("range-30").addEventListener("click", () => {
+  currentRange = 30;
+  document.getElementById("range-30").classList.add("active");
+  document.getElementById("range-7").classList.remove("active");
+  browser.storage.local.get("histogramData").then(data => {
+    if (data.histogramData) updateChart(data.histogramData);
+  });
 });
 
 // CLEAR HISTORY
