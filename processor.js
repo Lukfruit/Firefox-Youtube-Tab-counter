@@ -77,11 +77,12 @@ const processAndSaveStats = async (tabMap) => {
           knownCount++;
         }
       
-        if (!channelStats[ch]) channelStats[ch] = { duration: 0, sessionTime: 0, watchTime: 0, count: 0 };
+        if (!channelStats[ch]) channelStats[ch] = { duration: 0, sessionTime: 0, watchTime: 0, count: 0, tabs: [] };
         channelStats[ch].duration += meta.duration;
         channelStats[ch].sessionTime += (meta.sessionTime || 0);
         channelStats[ch].watchTime += (meta.watchTime || 0);
         channelStats[ch].count += 1;
+        if (meta.tabId) channelStats[ch].tabs.push({ title: meta.title, tabId: meta.tabId });
 
         const cleanChannel = ch.toLowerCase().replace(/\s+/g, "");
         const cleanTitle = (meta.title || "").toLowerCase().replace(/\s+/g, "");
@@ -96,25 +97,26 @@ const processAndSaveStats = async (tabMap) => {
           if (cleanTag === cleanChannel || genericTags.includes(cleanTag) || cleanTag === cleanTitle) return;
         
           if (!tagStats[tag]) {
-            tagStats[tag] = { duration: 0, sessionTime: 0, watchTime: 0, count: 0, channels: new Set() };
+            tagStats[tag] = { duration: 0, sessionTime: 0, watchTime: 0, count: 0, channels: new Set(), tabs: [] };
           }
           tagStats[tag].duration += meta.duration;
           tagStats[tag].sessionTime += (meta.sessionTime || 0);
           tagStats[tag].watchTime += (meta.watchTime || 0);
           tagStats[tag].count += 1;
           tagStats[tag].channels.add(ch);
+          if (meta.tabId) tagStats[tag].tabs.push({ title: meta.title, tabId: meta.tabId });
         });
       }
     });
 
     let leaderboard = [];
     Object.entries(channelStats).forEach(([name, s]) => {
-      leaderboard.push({ label: `Channel: ${name}`, duration: s.duration, sessionTime: s.sessionTime, watchTime: s.watchTime, count: s.count });
+      leaderboard.push({ label: `Channel: ${name}`, duration: s.duration, sessionTime: s.sessionTime, watchTime: s.watchTime, count: s.count, tabs: s.tabs });
     });
 
     Object.entries(tagStats).forEach(([name, s]) => {
       if (s.channels.size >= 2) {
-        leaderboard.push({ label: `Tag: ${name}`, duration: s.duration, sessionTime: s.sessionTime, watchTime: s.watchTime, count: s.count });
+        leaderboard.push({ label: `Tag: ${name}`, duration: s.duration, sessionTime: s.sessionTime, watchTime: s.watchTime, count: s.count, tabs: s.tabs });
       }
     });
 

@@ -34,6 +34,7 @@ const refreshTotals = async () => {
       console.log("Processing tab:", t.id, t.url);
       
       let tabData = { 
+        tabId: t.id,
         duration: 0, 
         channel: "Unknown Channel", 
         title: t.title, 
@@ -88,6 +89,7 @@ browser.runtime.onMessage.addListener(async (m, sender) => {
     const tabId = sender.tab.id;
     if (!tabMap[tabId]) {
       tabMap[tabId] = { 
+        tabId: tabId,
         duration: 0, 
         channel: "Unknown Channel", 
         title: m.data.title, 
@@ -110,6 +112,7 @@ browser.runtime.onMessage.addListener(async (m, sender) => {
   if (m.type === "tabUpdate" && sender.tab) {
 	  const existing = tabMap[sender.tab.id];
 	  const newEntry = { 
+	        tabId: sender.tab.id,
 	        duration: m.data.duration, 
 	        channel: m.data.channel, 
 	        title: m.data.title, 
@@ -137,8 +140,9 @@ browser.runtime.onMessage.addListener(async (m, sender) => {
 // Instant cleanup on close
 browser.tabs.onRemoved.addListener(async (tabId) => {
   if (tabMap[tabId]) {
+    const { tabId: _, ...dataWithoutTabId } = tabMap[tabId];
     const closedTabData = {
-      ...tabMap[tabId],
+      ...dataWithoutTabId,
       timestamp: Date.now()
     };
 

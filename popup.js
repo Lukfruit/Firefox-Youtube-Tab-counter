@@ -1,5 +1,7 @@
 let chartInstance = null;
 let currentRange = 7;
+let expandedItems = new Set();
+let lastData = null;
 
 const renderLeaderboard = (listEl, items) => {
   while (listEl.firstChild) {
@@ -13,20 +15,40 @@ const renderLeaderboard = (listEl, items) => {
     const cleanName = item.label.replace(/^(Channel|Tag): /, "");
     const color = isChannel ? "#f87171" : "#60a5fa";
     const typeLabel = isChannel ? "CHANNEL" : "TAG";
+    const hasTabs = item.tabs && item.tabs.length > 0;
+    const isExpanded = expandedItems.has(item.label);
 
     const li = document.createElement("li");
-    li.className = "entry";
+    li.className = "entry-container";
+
+    const entryHeader = document.createElement("div");
+    entryHeader.className = "entry clickable";
+    if (hasTabs) {
+      entryHeader.addEventListener("click", () => {
+        if (expandedItems.has(item.label)) {
+          expandedItems.delete(item.label);
+        } else {
+          expandedItems.add(item.label);
+        }
+        render(lastData);
+      });
+    }
+
+    const arrow = document.createElement("span");
+    arrow.className = `toggle-arrow ${isExpanded ? 'expanded' : ''}`;
+    arrow.innerHTML = hasTabs ? "&#9654;" : "";
+    entryHeader.appendChild(arrow);
 
     const rank = document.createElement("span");
     rank.className = "rank";
     rank.textContent = `${index + 1}.`;
-    li.appendChild(rank);
+    entryHeader.appendChild(rank);
 
     const badge = document.createElement("span");
     badge.className = "badge";
     badge.style.backgroundColor = color;
     badge.textContent = typeLabel;
-    li.appendChild(badge);
+    entryHeader.appendChild(badge);
 
     const infoWrapper = document.createElement("div");
     infoWrapper.style.flexGrow = "1";
@@ -45,15 +67,38 @@ const renderLeaderboard = (listEl, items) => {
     count.textContent = ` (${item.count}x)`;
     infoWrapper.appendChild(count);
 
-    li.appendChild(infoWrapper);
+    entryHeader.appendChild(infoWrapper);
 
     const duration = document.createElement("span");
     duration.style.color = "#9ca3af";
     duration.style.fontSize = "12px";
-    // For live, show duration. For history, show watchTime.
     const timeToShow = item.watchTime > 0 ? item.watchTime : item.duration;
     duration.textContent = formatDuration(timeToShow);
-    li.appendChild(duration);
+    entryHeader.appendChild(duration);
+
+    li.appendChild(entryHeader);
+
+    if (hasTabs && isExpanded) {
+      const childrenUl = document.createElement("ul");
+      childrenUl.className = "entry-children";
+      
+      item.tabs.forEach(tab => {
+        const childLi = document.createElement("li");
+        childLi.className = "child-tab";
+        childLi.textContent = tab.title;
+        childLi.title = "Click to switch to this tab";
+        childLi.addEventListener("click", (e) => {
+          e.stopPropagation();
+          browser.tabs.update(tab.tabId, { active: true }).then(t => {
+            if (t && t.windowId) {
+              browser.windows.update(t.windowId, { focused: true });
+            }
+          });
+        });
+        childrenUl.appendChild(childLi);
+      });
+      li.appendChild(childrenUl);
+    }
 
     listEl.appendChild(li);
   });
@@ -137,6 +182,9 @@ const updateChart = (histogramData) => {
 };
 
 const render = (data) => {
+  if (!data) return;
+  lastData = data;
+  
   // Update scanning status regardless of whether we have totals yet
   const statusEl = document.getElementById("status");
   if (statusEl) {
