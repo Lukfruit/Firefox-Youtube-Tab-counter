@@ -59,69 +59,83 @@ const renderLeaderboard = (listEl, items) => {
   });
 };
 
-const updateChart = (histogramData) => {
-  const ctx = document.getElementById('historyChart').getContext('2d');
+const updateChart = (histogramData, animationConfig = {}) => {
+  const chartEl = document.getElementById('historyChart');
+  if (!chartEl) return;
+  const ctx = chartEl.getContext('2d');
   
-  // Sort dates descending and take only the latest N days based on currentRange
   const sortedDates = Object.keys(histogramData).sort().reverse();
   const filteredLabels = sortedDates.slice(0, currentRange).reverse();
   
-  const sessionData = filteredLabels.map(l => (histogramData[l]?.sessionTime || 0) / 60); // min
-  const watchData = filteredLabels.map(l => (histogramData[l]?.watchTime || 0) / 60); // min
+  const labels = filteredLabels.map(l => l.split('-').slice(1).join('/'));
+  const watchData = filteredLabels.map(l => (histogramData[l]?.watchTime || 0) / 60);
+  const sessionData = filteredLabels.map(l => (histogramData[l]?.sessionTime || 0) / 60);
 
   if (chartInstance) {
-    chartInstance.destroy();
-  }
-
-  chartInstance = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: filteredLabels.map(l => l.split('-').slice(1).join('/')), // MM/DD
-      datasets: [
-        {
-          label: 'Watch Time (min)',
-          data: watchData,
-          backgroundColor: '#f87171',
-          borderRadius: 2
+    chartInstance.data.labels = labels;
+    chartInstance.data.datasets[0].data = watchData;
+    chartInstance.data.datasets[1].data = sessionData;
+    chartInstance.update(animationConfig);
+  } else {
+    chartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Watch Time (min)',
+            data: watchData,
+            backgroundColor: '#f87171',
+            borderRadius: 2,
+            order: 1 // Draw on top
+          },
+          {
+            label: 'Total Time (min)',
+            data: sessionData,
+            backgroundColor: '#4b5563',
+            borderRadius: 2,
+            order: 2 // Draw behind
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: {
+          duration: 800,
+          easing: 'easeOutQuart'
         },
-        {
-          label: 'Total Time (min)',
-          data: sessionData,
-          backgroundColor: '#4b5563',
-          borderRadius: 2
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => {
-              const val = ctx.raw;
-              const h = Math.floor(val / 60);
-              const m = Math.round(val % 60);
-              return `${ctx.dataset.label}: ${h}h ${m}m`;
+        animations: {
+          x: { duration: 0 }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const val = ctx.raw;
+                const h = Math.floor(val / 60);
+                const m = Math.round(val % 60);
+                return `${ctx.dataset.label}: ${h}h ${m}m`;
+              }
             }
           }
-        }
-      },
-      scales: {
-        x: { 
-          stacked: true,
-          grid: { display: false },
-          ticks: { font: { size: 9 }, color: '#6b7280' }
         },
-        y: { 
-          stacked: false, 
-          grid: { color: '#374151' },
-          ticks: { font: { size: 9 }, color: '#6b7280' }
+        scales: {
+          x: { 
+            stacked: true, // Overlap bars by sharing the same stack
+            grid: { display: false },
+            ticks: { font: { size: 9 }, color: '#6b7280' }
+          },
+          y: { 
+            stacked: false, // Don't add heights
+            grid: { color: '#374151' },
+            ticks: { font: { size: 9 }, color: '#6b7280' }
+          }
         }
       }
-    }
-  });
+    });
+  }
 };
 
 const render = (data) => {
@@ -153,8 +167,9 @@ const render = (data) => {
     renderLeaderboard(document.getElementById("history-leaderboard"), historyTotals.leaderboard);
   }
 
-  if (data.histogramData) {
-    updateChart(data.histogramData);
+  const trendsVisible = document.getElementById("view-trends").style.display === "flex";
+  if (data.histogramData && trendsVisible) {
+    updateChart(data.histogramData, { duration: 0 });
   }
 
   if (data.storageSizeKB) {
@@ -171,30 +186,54 @@ document.getElementById("tab-live").addEventListener("click", () => {
 });
 
 document.getElementById("tab-trends").addEventListener("click", () => {
+  if (document.getElementById("tab-trends").classList.contains("active")) return;
+
   document.getElementById("tab-trends").classList.add("active");
   document.getElementById("tab-live").classList.remove("active");
   document.getElementById("view-trends").style.display = "flex";
   document.getElementById("view-live").style.display = "none";
+  
+  if (chartInstance) {
+    chartInstance.destroy();
+    chartInstance = null;
+  }
+
+  browser.storage.local.get("histogramData").then(data => {
+    if (data.histogramData) updateChart(data.histogramData);
+  });
 });
 
 // RANGE SWITCHING
-document.getElementById("range-7").addEventListener("click", () => {
-  currentRange = 7;
-  document.getElementById("range-7").classList.add("active");
-  document.getElementById("range-30").classList.remove("active");
-  browser.storage.local.get("histogramData").then(data => {
-    if (data.histogramData) updateChart(data.histogramData);
-  });
-});
+const onRangeChange = (range) => {
+  if (currentRange === range) return;
+  
+  // 1. Make current bars disappear instantly
+  if (chartInstance) {
+    chartInstance.data.datasets.forEach(ds => {
+      ds.data = ds.data.map(() => 0);
+    });
+    chartInstance.update({ duration: 0 });
+  }
 
-document.getElementById("range-30").addEventListener("click", () => {
-  currentRange = 30;
-  document.getElementById("range-30").classList.add("active");
-  document.getElementById("range-7").classList.remove("active");
-  browser.storage.local.get("histogramData").then(data => {
-    if (data.histogramData) updateChart(data.histogramData);
-  });
-});
+  // 2. Short delay to ensure the "empty" state is cleared, then unfold
+  setTimeout(() => {
+    currentRange = range;
+    document.getElementById("range-7").classList.toggle("active", range === 7);
+    document.getElementById("range-30").classList.toggle("active", range === 30);
+    
+    browser.storage.local.get("histogramData").then(data => {
+      if (data.histogramData) {
+        updateChart(data.histogramData, {
+          duration: 600,
+          easing: 'easeOutQuart'
+        });
+      }
+    });
+  }, 50);
+};
+
+document.getElementById("range-7").addEventListener("click", () => onRangeChange(7));
+document.getElementById("range-30").addEventListener("click", () => onRangeChange(30));
 
 // CLEAR HISTORY
 document.getElementById("clear-history").addEventListener("click", (e) => {
