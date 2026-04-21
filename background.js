@@ -2,11 +2,13 @@
 const YOUTUBE_TAB_QUERY = { url: ["*://*.youtube.com/*", "*://youtu.be/*"] };
 const HEARTBEAT_INTERVAL = 5; // seconds
 let isScanning = false;
-let tabMap = {}; // Persistent memory: { tabId: { duration, channel, tags, title, sessionTime, watchTime } }
+let tabMap = {}; // Persistent memory: { tabId: { duration, currentTime, channel, tags, title, sessionTime, watchTime } }
+let settings = { minWatchTime: 30 };
 
-// Load existing map on startup to prevent "stale" leaderboard
-browser.storage.local.get("tabMap").then(res => {
+// Load existing map and settings on startup
+browser.storage.local.get(["tabMap", "settings"]).then(res => {
   if (res.tabMap) tabMap = res.tabMap;
+  if (res.settings) settings = { ...settings, ...res.settings };
 });
 
 // Helper to check if a tab is the active one in the focused window
@@ -36,6 +38,7 @@ const refreshTotals = async () => {
       let tabData = { 
         tabId: t.id,
         duration: 0, 
+        currentTime: 0,
         channel: "Unknown Channel", 
         title: t.title, 
         tags: tabMap[t.id]?.tags || [], 
@@ -48,6 +51,7 @@ const refreshTotals = async () => {
         const res = await browser.tabs.sendMessage(t.id, { type: "getDuration" });
         if (res) {
           tabData.duration = res.durationSeconds;
+          tabData.currentTime = res.currentTime;
           tabData.channel = res.channel;
           tabData.tags = res.tags || tabData.tags;
         }
@@ -91,6 +95,7 @@ browser.runtime.onMessage.addListener(async (m, sender) => {
       tabMap[tabId] = { 
         tabId: tabId,
         duration: 0, 
+        currentTime: 0,
         channel: "Unknown Channel", 
         title: m.data.title, 
         tags: [], 
@@ -99,6 +104,7 @@ browser.runtime.onMessage.addListener(async (m, sender) => {
       };
     }
 
+    tabMap[tabId].currentTime = m.data.currentTime;
     const isActive = await isTabActiveAndFocused(tabId, sender.tab.windowId);
     if (isActive) {
       tabMap[tabId].sessionTime += HEARTBEAT_INTERVAL;
@@ -114,6 +120,7 @@ browser.runtime.onMessage.addListener(async (m, sender) => {
 	  const newEntry = { 
 	        tabId: sender.tab.id,
 	        duration: m.data.duration, 
+          currentTime: m.data.currentTime,
 	        channel: m.data.channel, 
 	        title: m.data.title, 
 	        tags: m.data.tags || existing?.tags || [],
@@ -135,24 +142,44 @@ browser.runtime.onMessage.addListener(async (m, sender) => {
 		  
 	      processAndSaveStats(tabMap);
   }
+
+  if (m.type === "updateSettings") {
+    settings = { ...settings, ...m.settings };
+    await browser.storage.local.set({ settings });
+    processAndSaveStats(tabMap);
+  }
 });
 
 // Instant cleanup on close
 browser.tabs.onRemoved.addListener(async (tabId) => {
   if (tabMap[tabId]) {
-    const { tabId: _, ...dataWithoutTabId } = tabMap[tabId];
-    const closedTabData = {
-      ...dataWithoutTabId,
-      timestamp: Date.now()
-    };
+    const entry = tabMap[tabId];
+    const { tabId: _, ...dataWithoutTabId } = entry;
+    
+    // THRESHOLD LOGIC
+    // 1. Minimum watch time met
+    // 2. OR video is shorter than threshold and was watched fully (>= 90%)
+    const isWatchedEnough = entry.watchTime >= settings.minWatchTime;
+    const isShortButWatchedFully = entry.duration > 0 && 
+                                  entry.duration < settings.minWatchTime && 
+                                  (entry.watchTime >= entry.duration * 0.9 || entry.currentTime >= entry.duration * 0.9);
 
-    try {
-      const res = await browser.storage.local.get("historyLog");
-      const historyLog = res.historyLog || [];
-      historyLog.push(closedTabData);
-      await browser.storage.local.set({ historyLog });
-    } catch (e) {
-      console.error("Failed to save history:", e);
+    if (isWatchedEnough || isShortButWatchedFully) {
+      const closedTabData = {
+        ...dataWithoutTabId,
+        timestamp: Date.now()
+      };
+
+      try {
+        const res = await browser.storage.local.get("historyLog");
+        const historyLog = res.historyLog || [];
+        historyLog.push(closedTabData);
+        await browser.storage.local.set({ historyLog });
+      } catch (e) {
+        console.error("Failed to save history:", e);
+      }
+    } else {
+      console.log("Tab removed but did not meet watch time threshold:", entry.title);
     }
 
     delete tabMap[tabId];

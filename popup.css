@@ -239,3 +239,64 @@ button {
 button:hover {
   background: #b91c1c;
 }
+
+/* Settings View Styles */
+.settings-icon {
+  flex: 0 0 40px !important;
+  font-size: 18px;
+  color: #9ca3af;
+}
+
+.settings-header {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #f87171;
+}
+
+.settings-group {
+  background: #1f2937;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #374151;
+  margin-bottom: 15px;
+}
+
+.settings-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.input-desc {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.input-row {
+  display: flex;
+  gap: 10px;
+}
+
+input[type="number"] {
+  background: #111827;
+  border: 1px solid #4b5563;
+  color: white;
+  padding: 8px;
+  border-radius: 4px;
+  flex: 1;
+}
+
+.save-btn {
+  width: auto;
+  margin-top: 0;
+  padding: 8px 15px;
+  background: #059669; /* Green */
+}
+
+.save-btn:hover {
+  background: #047857;
+}

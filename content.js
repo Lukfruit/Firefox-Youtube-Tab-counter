@@ -45,12 +45,16 @@ const getTags = () => {
 // The Live Reporter
 const sendUpdate = () => {
   const duration = getDurationSeconds();
+  const video = document.querySelector("video");
+  const currentTime = video ? Math.floor(video.currentTime) : 0;
+  
   if (duration) {
     browser.runtime.sendMessage({
       type: "tabUpdate",
       data: {
         title: document.title,
         duration: duration,
+        currentTime: currentTime,
         channel: getChannelName(),
         tags: getTags()
       }
@@ -62,11 +66,13 @@ const sendUpdate = () => {
 setInterval(() => {
   const video = document.querySelector("video");
   const isPlaying = video && !video.paused && !video.ended && video.readyState > 2;
+  const currentTime = video ? Math.floor(video.currentTime) : 0;
   
   browser.runtime.sendMessage({
     type: "heartbeat",
     data: {
       isPlaying: isPlaying,
+      currentTime: currentTime,
       title: document.title, // Keep title updated for background tracking
       url: window.location.href
     }
@@ -99,8 +105,10 @@ if (titleTag) {
 // 3. Keep the listener for the background's manual scan/initial scan
 browser.runtime.onMessage.addListener((message) => {
   if (message?.type === "getDuration") {
+    const video = document.querySelector("video");
     return Promise.resolve({ 
       durationSeconds: getDurationSeconds(),
+      currentTime: video ? Math.floor(video.currentTime) : 0,
       channel: getChannelName(),
       title: document.title,
       tags: getTags()

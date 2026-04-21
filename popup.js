@@ -72,6 +72,8 @@ const renderLeaderboard = (listEl, items) => {
     const duration = document.createElement("span");
     duration.style.color = "#9ca3af";
     duration.style.fontSize = "12px";
+    
+    // In History view, item.watchTime is our primary metric
     const timeToShow = item.watchTime > 0 ? item.watchTime : item.duration;
     duration.textContent = formatDuration(timeToShow);
     entryHeader.appendChild(duration);
@@ -85,7 +87,22 @@ const renderLeaderboard = (listEl, items) => {
       item.tabs.forEach(tab => {
         const childLi = document.createElement("li");
         childLi.className = "child-tab";
-        childLi.textContent = tab.title;
+        
+        let titleText = tab.title;
+        if (tab.isLive) {
+          const liveSpan = document.createElement("span");
+          liveSpan.style.color = "#10b981";
+          liveSpan.style.fontSize = "9px";
+          liveSpan.style.fontWeight = "bold";
+          liveSpan.style.marginRight = "5px";
+          liveSpan.textContent = "[LIVE]";
+          childLi.appendChild(liveSpan);
+        }
+        
+        const titleSpan = document.createElement("span");
+        titleSpan.textContent = titleText;
+        childLi.appendChild(titleSpan);
+
         childLi.title = "Click to switch to this tab";
         childLi.addEventListener("click", (e) => {
           e.stopPropagation();
@@ -223,28 +240,54 @@ const render = (data) => {
   if (data.storageSizeKB) {
     document.getElementById("storage-size").textContent = data.storageSizeKB;
   }
+
+  if (data.settings && data.settings.minWatchTime !== undefined) {
+    document.getElementById("min-watch-time").value = data.settings.minWatchTime;
+  }
 };
 
 // TAB SWITCHING
-document.getElementById("tab-live").addEventListener("click", () => {
-  document.getElementById("tab-live").classList.add("active");
-  document.getElementById("tab-trends").classList.remove("active");
-  document.getElementById("view-live").style.display = "flex";
-  document.getElementById("view-trends").style.display = "none";
-});
-
-document.getElementById("tab-trends").addEventListener("click", () => {
-  if (document.getElementById("tab-trends").classList.contains("active")) return;
-
-  document.getElementById("tab-trends").classList.add("active");
-  document.getElementById("tab-live").classList.remove("active");
-  document.getElementById("view-trends").style.display = "flex";
-  document.getElementById("view-live").style.display = "none";
+const showView = (viewId) => {
+  const views = ["view-live", "view-trends", "view-settings"];
+  const tabs = ["tab-live", "tab-trends", "tab-settings"];
   
-  browser.storage.local.get("histogramData").then(data => {
-    if (data.histogramData) updateChart(data.histogramData);
+  views.forEach(v => document.getElementById(v).style.display = v === viewId ? "flex" : "none");
+  tabs.forEach(t => document.getElementById(t).classList.toggle("active", t === viewId.replace("view-", "tab-")));
+  
+  if (viewId === "view-trends") {
+    browser.storage.local.get("histogramData").then(data => {
+      if (data.histogramData) updateChart(data.histogramData);
+    });
+  }
+};
+
+document.getElementById("tab-live").addEventListener("click", () => showView("view-live"));
+document.getElementById("tab-trends").addEventListener("click", () => showView("view-trends"));
+document.getElementById("tab-settings").addEventListener("click", () => showView("view-settings"));
+
+// SETTINGS
+document.getElementById("save-settings").addEventListener("click", () => {
+  const minWatchTime = parseInt(document.getElementById("min-watch-time").value, 10) || 0;
+  browser.runtime.sendMessage({ 
+    type: "updateSettings", 
+    settings: { minWatchTime } 
+  }).then(() => {
+    const btn = document.getElementById("save-settings");
+    const originalText = btn.textContent;
+    btn.textContent = "Saved!";
+    btn.style.background = "#059669";
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.style.background = "";
+    }, 2000);
   });
 });
+
+// Load version
+const manifest = browser.runtime.getManifest();
+if (document.getElementById("ext-version")) {
+  document.getElementById("ext-version").textContent = manifest.version;
+}
 
 // RANGE SWITCHING
 const onRangeChange = (range) => {

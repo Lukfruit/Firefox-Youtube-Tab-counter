@@ -8,6 +8,7 @@
   <div class="tabs">
     <button id="tab-live" class="tab-btn active">Live Now</button>
     <button id="tab-trends" class="tab-btn">Trends & History</button>
+    <button id="tab-settings" class="tab-btn settings-icon" title="Settings">&#9881;</button>
   </div>
 
   <div id="view-live" class="view">
@@ -47,6 +48,18 @@
     <div class="storage-info">
       Database: <span id="storage-size">0.0</span> KB
       <a href="#" id="clear-history" style="color: #e74c3c; margin-left: 10px;">Clear All</a>
+    </div>
+  </div>
+
+  <div id="view-settings" class="view" style="display: none;">
+    <div class="settings-header">Settings</div>
+    <div class="settings-group">
+      <label for="min-watch-time">Min. Watch Time (sec)</label>
+      <div class="input-desc">Videos watched less than this aren't saved to history (unless shorter & watched fully).</div>
+      <div class="input-row">
+        <input type="number" id="min-watch-time" min="0" step="1" value="30">
+        <button id="save-settings" class="save-btn">Save Settings</button>
+      </div>
     </div>
   </div>
 

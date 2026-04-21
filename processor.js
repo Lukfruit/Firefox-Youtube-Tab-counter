@@ -51,10 +51,11 @@ const fetchMetadataFromUrl = async (url) => {
  */
 const processAndSaveStats = async (tabMap) => {
   const openEntries = Object.values(tabMap);
-  const storage = await browser.storage.local.get("historyLog");
+  const storage = await browser.storage.local.get(["historyLog", "settings"]);
   const historyLog = storage.historyLog || [];
+  const settings = storage.settings || { minWatchTime: 30 };
 
-  const processEntries = (entries) => {
+  const processEntries = (entries, sortField = "duration") => {
     let totalSeconds = 0;
     let totalSession = 0;
     let totalWatch = 0;
@@ -64,8 +65,8 @@ const processAndSaveStats = async (tabMap) => {
     let tagStats = {};     
 
     entries.forEach(meta => {
-      if (meta && meta.duration > 0) {
-        totalSeconds += meta.duration;
+      if (meta && (meta.duration > 0 || meta.watchTime > 0)) {
+        totalSeconds += (meta.duration || 0);
         totalSession += (meta.sessionTime || 0);
         totalWatch += (meta.watchTime || 0);
 	  
@@ -78,11 +79,11 @@ const processAndSaveStats = async (tabMap) => {
         }
       
         if (!channelStats[ch]) channelStats[ch] = { duration: 0, sessionTime: 0, watchTime: 0, count: 0, tabs: [] };
-        channelStats[ch].duration += meta.duration;
+        channelStats[ch].duration += (meta.duration || 0);
         channelStats[ch].sessionTime += (meta.sessionTime || 0);
         channelStats[ch].watchTime += (meta.watchTime || 0);
         channelStats[ch].count += 1;
-        if (meta.tabId) channelStats[ch].tabs.push({ title: meta.title, tabId: meta.tabId });
+        if (meta.tabId) channelStats[ch].tabs.push({ title: meta.title, tabId: meta.tabId, isLive: true });
 
         const cleanChannel = ch.toLowerCase().replace(/\s+/g, "");
         const cleanTitle = (meta.title || "").toLowerCase().replace(/\s+/g, "");
@@ -99,12 +100,12 @@ const processAndSaveStats = async (tabMap) => {
           if (!tagStats[tag]) {
             tagStats[tag] = { duration: 0, sessionTime: 0, watchTime: 0, count: 0, channels: new Set(), tabs: [] };
           }
-          tagStats[tag].duration += meta.duration;
+          tagStats[tag].duration += (meta.duration || 0);
           tagStats[tag].sessionTime += (meta.sessionTime || 0);
           tagStats[tag].watchTime += (meta.watchTime || 0);
           tagStats[tag].count += 1;
           tagStats[tag].channels.add(ch);
-          if (meta.tabId) tagStats[tag].tabs.push({ title: meta.title, tabId: meta.tabId });
+          if (meta.tabId) tagStats[tag].tabs.push({ title: meta.title, tabId: meta.tabId, isLive: true });
         });
       }
     });
@@ -127,18 +128,19 @@ const processAndSaveStats = async (tabMap) => {
       totalWatch,
       knownCount,
       unknownCount,
-      leaderboard: leaderboard.sort((a, b) => b.duration - a.duration).slice(0, 25),
+      leaderboard: leaderboard.sort((a, b) => b[sortField] - a[sortField]).slice(0, 25),
       uniqueChannels: Object.keys(channelStats).length,
       uniqueTags: Object.keys(tagStats).length
     };
   };
 
-  // 1. Live Stats
-  const liveTotals = processEntries(openEntries);
+  // 1. Live Stats: Sort by duration (potential watch time)
+  const liveTotals = processEntries(openEntries, "duration");
 
-  // 2. Combined Stats (History + Open Tabs)
-  const combinedEntries = [...openEntries, ...historyLog];
-  const historyTotals = processEntries(combinedEntries);
+  // 2. Combined Stats (History + Progressing Open Tabs): Sort by watchTime
+  const progressingOpenEntries = openEntries.filter(e => e.watchTime > 0);
+  const combinedEntries = [...historyLog, ...progressingOpenEntries];
+  const historyTotals = processEntries(combinedEntries, "watchTime");
 
   // 3. Histogram Data
   const now = new Date();
@@ -150,6 +152,7 @@ const processAndSaveStats = async (tabMap) => {
     histogram[dateStr] = { sessionTime: 0, watchTime: 0 };
   }
 
+  // Include historyLog in histogram
   historyLog.forEach(entry => {
     const dateStr = new Date(entry.timestamp).toISOString().split("T")[0];
     if (histogram[dateStr]) {
@@ -157,6 +160,15 @@ const processAndSaveStats = async (tabMap) => {
       histogram[dateStr].watchTime += (entry.watchTime || 0);
     }
   });
+
+  // Include current active session in histogram (today only)
+  const todayStr = now.toISOString().split("T")[0];
+  if (histogram[todayStr]) {
+    progressingOpenEntries.forEach(entry => {
+      histogram[todayStr].sessionTime += (entry.sessionTime || 0);
+      histogram[todayStr].watchTime += (entry.watchTime || 0);
+    });
+  }
 
   const storageJson = JSON.stringify({ historyLog, tabMap });
   const storageSizeKB = (new Blob([storageJson]).size / 1024).toFixed(1);
@@ -167,6 +179,7 @@ const processAndSaveStats = async (tabMap) => {
     youtubeTotals: liveTotals,
     historyTotals: historyTotals,
     histogramData: histogram,
-    storageSizeKB: storageSizeKB
+    storageSizeKB: storageSizeKB,
+    settings: settings
   });
 };
