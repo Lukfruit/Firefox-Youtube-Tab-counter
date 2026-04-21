@@ -37,6 +37,7 @@ YouTube Tab Analyzer is a Firefox browser extension (Manifest V2) that aggregate
 ## Key Development Conventions
 
 - **Heartbeat Pattern**: Use heartbeats for any time-based tracking to ensure accuracy across multiple tabs.
+- **Code Integrity**: Preserving existing comments and non-related logic is MANDATORY. Do not delete "working" code or descriptive comments during surgical updates.
 - **Storage Monitoring**: Monitor the size of `historyLog` as it persists data indefinitely until manually cleared.
 - **Library Management**: Third-party libraries like `Chart.js` are bundled locally in the `libs/` folder.
 

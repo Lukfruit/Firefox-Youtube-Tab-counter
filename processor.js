@@ -3,10 +3,23 @@
 /**
  * The Scraper: Fetches video data for tabs that aren't currently loaded
  */
+let lastRateLimitTime = 0;
+
 const fetchMetadataFromUrl = async (url) => {
+  // If we hit a rate limit in the last 10 minutes, don't even try
+  if (Date.now() - lastRateLimitTime < 10 * 60 * 1000) {
+    console.warn("Skipping fetch due to recent rate limiting");
+    return null;
+  }
+
   console.log("Fetching metadata for:", url);
   try {
     const response = await fetch(url);
+    if (response.status === 429) {
+      console.error("YouTube rate limit (429) hit!");
+      lastRateLimitTime = Date.now();
+      return null;
+    }
     if (!response.ok) {
       console.error("Fetch failed with status:", response.status);
       return null;
@@ -75,7 +88,12 @@ const processAndSaveStats = async (tabMap) => {
 	  
         (meta.tags || []).forEach(tag => {
           const cleanTag = tag.toLowerCase().replace(/\s+/g, "");
-          if (cleanTag === cleanChannel || cleanTag === "yt:cc=on" || cleanTag === cleanTitle) return;
+          const genericTags = [
+            "videosharing", "cameraphone", "videophone", "freeupload", "yt:cc=on",
+            "free", "video", "upload", "sharing"
+          ];
+          
+          if (cleanTag === cleanChannel || genericTags.includes(cleanTag) || cleanTag === cleanTitle) return;
         
           if (!tagStats[tag]) {
             tagStats[tag] = { duration: 0, sessionTime: 0, watchTime: 0, count: 0, channels: new Set() };
@@ -143,6 +161,7 @@ const processAndSaveStats = async (tabMap) => {
 
   await browser.storage.local.set({
     isScanning: false,
+    tabMap: tabMap,
     youtubeTotals: liveTotals,
     historyTotals: historyTotals,
     histogramData: histogram,

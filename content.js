@@ -34,6 +34,14 @@ const getChannelName = () => {
   return "Unknown Channel";
 };
 
+const getTags = () => {
+  const metaKeywords = document.querySelector('meta[name="keywords"]');
+  if (metaKeywords && metaKeywords.content) {
+    return metaKeywords.content.split(",").map(t => t.trim()).filter(t => t.length > 0);
+  }
+  return [];
+};
+
 // The Live Reporter
 const sendUpdate = () => {
   const duration = getDurationSeconds();
@@ -43,7 +51,8 @@ const sendUpdate = () => {
       data: {
         title: document.title,
         duration: duration,
-        channel: getChannelName()
+        channel: getChannelName(),
+        tags: getTags()
       }
     });
   }
@@ -90,11 +99,11 @@ if (titleTag) {
 // 3. Keep the listener for the background's manual scan/initial scan
 browser.runtime.onMessage.addListener((message) => {
   if (message?.type === "getDuration") {
-    const duration = getDurationSeconds();
     return Promise.resolve({ 
-      durationSeconds: duration,
+      durationSeconds: getDurationSeconds(),
       channel: getChannelName(),
-      title: document.title
+      title: document.title,
+      tags: getTags()
     });
   }
 });

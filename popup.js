@@ -121,12 +121,17 @@ const updateChart = (histogramData) => {
 };
 
 const render = (data) => {
+  // Update scanning status regardless of whether we have totals yet
+  const statusEl = document.getElementById("status");
+  if (statusEl) {
+    statusEl.textContent = data.isScanning 
+      ? `Scanning: ${data.currentScanned || 0} / ${data.totalToScan || '?'} tabs`
+      : "Idle (Updated)";
+  }
+
   // Live View
   const liveTotals = data.youtubeTotals;
   if (liveTotals) {
-    document.getElementById("status").textContent = data.isScanning 
-      ? `Scanning: ${data.currentScanned || 0} / ${data.totalToScan || '?'} tabs`
-      : "Idle (Updated)";
     document.getElementById("total-duration").textContent = formatDuration(liveTotals.totalSeconds || 0);
     document.getElementById("tab-count").textContent = liveTotals.totalTabs || 0;
     document.getElementById("channel-count").textContent = liveTotals.uniqueChannels || 0;

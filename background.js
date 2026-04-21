@@ -21,7 +21,7 @@ const isTabActiveAndFocused = async (tabId, windowId) => {
   }
 };
 
-//Batching refresh logic, modified to update tabMap
+// Sequential refresh logic to be very gentle on YouTube
 const refreshTotals = async () => {
   if (isScanning) return;
   isScanning = true;
@@ -29,49 +29,47 @@ const refreshTotals = async () => {
     const tabs = await browser.tabs.query(YOUTUBE_TAB_QUERY);
     await browser.storage.local.set({ isScanning: true, totalToScan: tabs.length, currentScanned: 0 });
 
-    const BATCH_SIZE = 5;
-    for (let i = 0; i < tabs.length; i += BATCH_SIZE) {
-      const batch = tabs.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < tabs.length; i++) {
+      const t = tabs[i];
+      console.log("Processing tab:", t.id, t.url);
       
-      await Promise.all(batch.map(async (t) => {
-        console.log("Processing tab:", t.id, t.url);
-        let meta = null;
-        let tabData = { 
-          duration: 0, 
-          channel: "Unknown Channel", 
-          title: t.title, 
-          tags: tabMap[t.id]?.tags || [], // Preserve existing tags
-          sessionTime: tabMap[t.id]?.sessionTime || 0,
-          watchTime: tabMap[t.id]?.watchTime || 0
-        };
+      let tabData = { 
+        duration: 0, 
+        channel: "Unknown Channel", 
+        title: t.title, 
+        tags: tabMap[t.id]?.tags || [], 
+        sessionTime: tabMap[t.id]?.sessionTime || 0,
+        watchTime: tabMap[t.id]?.watchTime || 0
+      };
 
-        try {
-          // Try getting live data from the tab first
-          const res = await browser.tabs.sendMessage(t.id, { type: "getDuration" });
-          if (res) {
-            tabData.duration = res.durationSeconds;
-            tabData.channel = res.channel;
-          }
-        } catch (e) { 
-          console.log("Tab", t.id, "is likely asleep or content script not ready");
+      try {
+        // 1. Try getting live data from the tab first (fastest, no network)
+        const res = await browser.tabs.sendMessage(t.id, { type: "getDuration" });
+        if (res) {
+          tabData.duration = res.durationSeconds;
+          tabData.channel = res.channel;
+          tabData.tags = res.tags || tabData.tags;
         }
+      } catch (e) { 
+        // This is NORMAL: Modern browsers "sleep" background tabs to save RAM.
+        // When a tab is asleep, we can't talk to it, so we fallback to the background fetch.
+        console.log("Tab", t.id, "is likely asleep; falling back to background fetch.");
+      }
 
-        // ALWAYS do the background fetch for tags and to verify the channel name
-        meta = await fetchMetadataFromUrl(t.url);
+      // 2. ONLY do background fetch if we still lack basic info
+      if (tabData.tags.length === 0 || tabData.channel === "Unknown Channel") {
+        // Add a small delay between any background fetches
+        await new Promise(r => setTimeout(r, 1500)); 
+        const meta = await fetchMetadataFromUrl(t.url);
         if (meta) {
           tabData.tags = meta.tags;
-          console.log("Updated tags for tab", t.id, ":", meta.tags.length);
-          // Priority: If background fetch found a name, use it over the content script's guess
-          if (meta.channel && meta.channel !== "Unknown Channel") {
-            tabData.channel = meta.channel;
-          }
+          if (meta.channel && meta.channel !== "Unknown Channel") tabData.channel = meta.channel;
           if (meta.duration > 0) tabData.duration = meta.duration;
         }
+      }
 
-        tabMap[t.id] = tabData;
-      }));
-
-      await browser.storage.local.set({ currentScanned: Math.min(i + BATCH_SIZE, tabs.length) });
+      tabMap[t.id] = tabData;
+      await browser.storage.local.set({ currentScanned: i + 1 });
     }
     
     console.log("Scanning complete. Processing stats for", Object.keys(tabMap).length, "tabs");
@@ -115,14 +113,14 @@ browser.runtime.onMessage.addListener(async (m, sender) => {
 	        duration: m.data.duration, 
 	        channel: m.data.channel, 
 	        title: m.data.title, 
-	        tags: existing?.tags || [],
+	        tags: m.data.tags || existing?.tags || [],
           sessionTime: existing?.sessionTime || 0,
           watchTime: existing?.watchTime || 0
 	      };
     
 	      tabMap[sender.tab.id] = newEntry;
 
-	      // Trigger an immediate background fetch for tags if we don't have them
+	      // Trigger an immediate background fetch for tags ONLY if we still don't have them
 	      if (newEntry.tags.length === 0) {
 	        fetchMetadataFromUrl(sender.tab.url).then(meta => {
 	          if (meta && tabMap[sender.tab.id]) {
