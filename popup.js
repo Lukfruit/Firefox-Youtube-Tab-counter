@@ -59,7 +59,7 @@ const renderLeaderboard = (listEl, items) => {
   });
 };
 
-const updateChart = (histogramData, animationConfig = {}) => {
+const updateChart = (histogramData) => {
   const chartEl = document.getElementById('historyChart');
   if (!chartEl) return;
   const ctx = chartEl.getContext('2d');
@@ -71,71 +71,67 @@ const updateChart = (histogramData, animationConfig = {}) => {
   const watchData = filteredLabels.map(l => (histogramData[l]?.watchTime || 0) / 60);
   const sessionData = filteredLabels.map(l => (histogramData[l]?.sessionTime || 0) / 60);
 
+  // Always destroy the old chart to prevent width morphing and "artifact" bars
   if (chartInstance) {
-    chartInstance.data.labels = labels;
-    chartInstance.data.datasets[0].data = watchData;
-    chartInstance.data.datasets[1].data = sessionData;
-    chartInstance.update(animationConfig);
-  } else {
-    chartInstance = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            label: 'Watch Time (min)',
-            data: watchData,
-            backgroundColor: '#f87171',
-            borderRadius: 2,
-            order: 1 // Draw on top
-          },
-          {
-            label: 'Total Time (min)',
-            data: sessionData,
-            backgroundColor: '#4b5563',
-            borderRadius: 2,
-            order: 2 // Draw behind
-          }
-        ]
+    chartInstance.destroy();
+    chartInstance = null;
+  }
+
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Watch Time (min)',
+          data: watchData,
+          backgroundColor: '#f87171',
+          borderRadius: 2,
+          order: 1
+        },
+        {
+          label: 'Total Time (min)',
+          data: sessionData,
+          backgroundColor: '#4b5563',
+          borderRadius: 2,
+          order: 2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {
+        duration: 800,
+        easing: 'easeOutQuart'
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: {
-          duration: 800,
-          easing: 'easeOutQuart'
-        },
-        animations: {
-          x: { duration: 0 }
-        },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const val = ctx.raw;
-                const h = Math.floor(val / 60);
-                const m = Math.round(val % 60);
-                return `${ctx.dataset.label}: ${h}h ${m}m`;
-              }
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const val = ctx.raw;
+              const h = Math.floor(val / 60);
+              const m = Math.round(val % 60);
+              return `${ctx.dataset.label}: ${h}h ${m}m`;
             }
           }
+        }
+      },
+      scales: {
+        x: { 
+          stacked: true,
+          grid: { display: false },
+          ticks: { font: { size: 9 }, color: '#6b7280' }
         },
-        scales: {
-          x: { 
-            stacked: true, // Overlap bars by sharing the same stack
-            grid: { display: false },
-            ticks: { font: { size: 9 }, color: '#6b7280' }
-          },
-          y: { 
-            stacked: false, // Don't add heights
-            grid: { color: '#374151' },
-            ticks: { font: { size: 9 }, color: '#6b7280' }
-          }
+        y: { 
+          stacked: false,
+          grid: { color: '#374151' },
+          ticks: { font: { size: 9 }, color: '#6b7280' }
         }
       }
-    });
-  }
+    }
+  });
 };
 
 const render = (data) => {
@@ -168,8 +164,10 @@ const render = (data) => {
   }
 
   const trendsVisible = document.getElementById("view-trends").style.display === "flex";
-  if (data.histogramData && trendsVisible) {
-    updateChart(data.histogramData, { duration: 0 });
+  // Only update on heartbeat if trends are visible AND chart doesn't exist yet
+  // We avoid re-creating the chart every 5 seconds while looking at it
+  if (data.histogramData && trendsVisible && !chartInstance) {
+    updateChart(data.histogramData);
   }
 
   if (data.storageSizeKB) {
@@ -193,11 +191,6 @@ document.getElementById("tab-trends").addEventListener("click", () => {
   document.getElementById("view-trends").style.display = "flex";
   document.getElementById("view-live").style.display = "none";
   
-  if (chartInstance) {
-    chartInstance.destroy();
-    chartInstance = null;
-  }
-
   browser.storage.local.get("histogramData").then(data => {
     if (data.histogramData) updateChart(data.histogramData);
   });
@@ -206,30 +199,16 @@ document.getElementById("tab-trends").addEventListener("click", () => {
 // RANGE SWITCHING
 const onRangeChange = (range) => {
   if (currentRange === range) return;
+  currentRange = range;
   
-  // 1. Make current bars disappear instantly
-  if (chartInstance) {
-    chartInstance.data.datasets.forEach(ds => {
-      ds.data = ds.data.map(() => 0);
-    });
-    chartInstance.update({ duration: 0 });
-  }
-
-  // 2. Short delay to ensure the "empty" state is cleared, then unfold
-  setTimeout(() => {
-    currentRange = range;
-    document.getElementById("range-7").classList.toggle("active", range === 7);
-    document.getElementById("range-30").classList.toggle("active", range === 30);
-    
-    browser.storage.local.get("histogramData").then(data => {
-      if (data.histogramData) {
-        updateChart(data.histogramData, {
-          duration: 600,
-          easing: 'easeOutQuart'
-        });
-      }
-    });
-  }, 50);
+  document.getElementById("range-7").classList.toggle("active", range === 7);
+  document.getElementById("range-30").classList.toggle("active", range === 30);
+  
+  browser.storage.local.get("histogramData").then(data => {
+    if (data.histogramData) {
+      updateChart(data.histogramData);
+    }
+  });
 };
 
 document.getElementById("range-7").addEventListener("click", () => onRangeChange(7));
