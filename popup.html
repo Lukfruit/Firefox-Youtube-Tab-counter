@@ -3,6 +3,21 @@
 <head>
   <meta charset="utf-8">
   <link rel="stylesheet" href="popup.css">
+  <style>
+    .playing-badge {
+      color: #10b981;
+      font-size: 9px;
+      font-weight: bold;
+      margin-left: 5px;
+      vertical-align: middle;
+    }
+    .playing-badge-small {
+      font-size: 9px;
+      font-weight: bold;
+      margin-right: 5px;
+      color: #10b981;
+    }
+  </style>
 </head>
 <body>
   <div class="tabs">
@@ -79,6 +94,11 @@
 
   <script src="libs/chart.min.js"></script>
   <script src="utils.js"></script>
+  <script src="Namespace.js"></script>
+  <script src="core/Analytics.js"></script>
+  <script src="ui/Renderer.js"></script>
+  <script src="ui/ChartManager.js"></script>
+  <script src="popup/Controller.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
