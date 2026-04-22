@@ -20,10 +20,14 @@ window.YTA.Shell.Cache = {
     // Also calculate full history totals
     const historyTotals = window.YTA.Core.Analytics.processEntries([...historyLog, ...progressingOpen], "watchTime");
 
+    // Also calculate live totals for the "Live Now" tab
+    const youtubeTotals = window.YTA.Core.Analytics.processEntries(tabMapEntries, "duration");
+
     const storageJson = JSON.stringify({ historyLog, tabMap: window.YTA.State.tabMap });
     const storageSizeKB = (new Blob([storageJson]).size / 1024).toFixed(1);
 
     await browser.storage.local.set({
+      youtubeTotals,
       histogramData,
       todayTotals,
       historyTotals,

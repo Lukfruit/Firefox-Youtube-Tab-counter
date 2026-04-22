@@ -5,6 +5,7 @@
 window.YTA.Popup.ChartManager = {
   instance: null,
   currentRange: 7,
+  lastRange: null,
 
   /**
    * Updates or creates the trend chart
@@ -21,8 +22,19 @@ window.YTA.Popup.ChartManager = {
     const watchData = filteredLabels.map(l => (histogramData[l]?.watchTime || 0) / 60);
     const sessionData = filteredLabels.map(l => (histogramData[l]?.sessionTime || 0) / 60);
 
-    if (this.instance) {
+    // If the range changed, destroy the old chart to trigger a full growth animation
+    if (this.instance && this.lastRange !== this.currentRange) {
       this.instance.destroy();
+      this.instance = null;
+    }
+    this.lastRange = this.currentRange;
+
+    if (this.instance) {
+      this.instance.data.labels = labels;
+      this.instance.data.datasets[0].data = watchData;
+      this.instance.data.datasets[1].data = sessionData;
+      this.instance.update();
+      return;
     }
 
     this.instance = new Chart(ctx, {

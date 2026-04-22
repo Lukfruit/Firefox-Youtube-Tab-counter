@@ -95,6 +95,12 @@ window.YTA.Background.Tracker = {
 
     window.YTA.State.tabMap[tabId] = tabData;
     await window.YTA.Shell.Storage.saveTabMap(window.YTA.State.tabMap);
+
+    // If the tab just progressed, update the cache so the popup sees it
+    if (isActive) {
+      const res = await browser.storage.local.get("historyLog");
+      await window.YTA.Shell.Cache.update(res.historyLog || [], Object.values(window.YTA.State.tabMap));
+    }
   },
 
   /**
