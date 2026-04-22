@@ -3,7 +3,7 @@ let currentRange = 7;
 let expandedItems = new Set();
 let lastData = null;
 
-const renderLeaderboard = (listEl, items) => {
+const renderLeaderboard = (listEl, items, isHistory = false) => {
   while (listEl.firstChild) {
     listEl.removeChild(listEl.firstChild);
   }
@@ -61,6 +61,21 @@ const renderLeaderboard = (listEl, items) => {
     name.textContent = cleanName;
     infoWrapper.appendChild(name);
 
+    if (!isHistory && item.tabs) {
+      const anyPlaying = item.tabs.some(t => t.isPlaying);
+      
+      if (anyPlaying) {
+        const liveBadge = document.createElement("span");
+        liveBadge.style.color = "#10b981";
+        liveBadge.style.fontSize = "9px";
+        liveBadge.style.fontWeight = "bold";
+        liveBadge.style.marginLeft = "5px";
+        liveBadge.style.verticalAlign = "middle";
+        liveBadge.textContent = "[PLAYING]";
+        infoWrapper.appendChild(liveBadge);
+      }
+    }
+
     const count = document.createElement("span");
     count.style.color = "#6b7280";
     count.style.fontSize = "10px";
@@ -70,12 +85,19 @@ const renderLeaderboard = (listEl, items) => {
     entryHeader.appendChild(infoWrapper);
 
     const duration = document.createElement("span");
-    duration.style.color = "#9ca3af";
-    duration.style.fontSize = "12px";
+    duration.className = "duration-value";
     
-    // In History view, item.watchTime is our primary metric
-    const timeToShow = item.watchTime > 0 ? item.watchTime : item.duration;
-    duration.textContent = formatDuration(timeToShow);
+    // UI LOGIC IMPROVEMENT
+    if (isHistory) {
+      // Historical view: only show how much was actually watched
+      duration.textContent = formatDuration(item.watchTime || 0);
+    } else {
+      // Live view: show "Watched / Total Duration"
+      const watched = formatDuration(item.watchTime || 0);
+      const total = formatDuration(item.duration || 0);
+      duration.textContent = `${watched} / ${total}`;
+    }
+    
     entryHeader.appendChild(duration);
 
     li.appendChild(entryHeader);
@@ -89,14 +111,14 @@ const renderLeaderboard = (listEl, items) => {
         childLi.className = "child-tab";
         
         let titleText = tab.title;
-        if (tab.isLive) {
-          const liveSpan = document.createElement("span");
-          liveSpan.style.color = "#10b981";
-          liveSpan.style.fontSize = "9px";
-          liveSpan.style.fontWeight = "bold";
-          liveSpan.style.marginRight = "5px";
-          liveSpan.textContent = "[LIVE]";
-          childLi.appendChild(liveSpan);
+        if (!isHistory && tab.isLive && tab.isPlaying) {
+          const badgeSpan = document.createElement("span");
+          badgeSpan.style.fontSize = "9px";
+          badgeSpan.style.fontWeight = "bold";
+          badgeSpan.style.marginRight = "5px";
+          badgeSpan.style.color = "#10b981";
+          badgeSpan.textContent = "[PLAYING]";
+          childLi.appendChild(badgeSpan);
         }
         
         const titleSpan = document.createElement("span");
@@ -219,7 +241,14 @@ const render = (data) => {
     document.getElementById("known-count").textContent = liveTotals.knownCount || 0;
     document.getElementById("tag-count-meta").textContent = liveTotals.uniqueTags || 0;
     document.getElementById("unknown-count").textContent = liveTotals.unknownCount || 0;
-    renderLeaderboard(document.getElementById("live-leaderboard"), liveTotals.leaderboard);
+    renderLeaderboard(document.getElementById("live-leaderboard"), liveTotals.leaderboard, false);
+  }
+
+  // Today's Stats
+  const todayTotals = data.todayTotals;
+  if (todayTotals) {
+    document.getElementById("today-watch").textContent = formatDuration(todayTotals.totalWatch || 0);
+    document.getElementById("today-session").textContent = formatDuration(todayTotals.totalSession || 0);
   }
 
   // History View
@@ -227,7 +256,7 @@ const render = (data) => {
   if (historyTotals) {
     document.getElementById("history-watch").textContent = formatDuration(historyTotals.totalWatch || 0);
     document.getElementById("history-session").textContent = formatDuration(historyTotals.totalSession || 0);
-    renderLeaderboard(document.getElementById("history-leaderboard"), historyTotals.leaderboard);
+    renderLeaderboard(document.getElementById("history-leaderboard"), historyTotals.leaderboard, true);
   }
 
   const trendsVisible = document.getElementById("view-trends").style.display === "flex";
@@ -243,6 +272,9 @@ const render = (data) => {
 
   if (data.settings && data.settings.minWatchTime !== undefined) {
     document.getElementById("min-watch-time").value = data.settings.minWatchTime;
+  }
+  if (data.settings && data.settings.resetTime !== undefined) {
+    document.getElementById("reset-time").value = data.settings.resetTime;
   }
 };
 
@@ -268,9 +300,10 @@ document.getElementById("tab-settings").addEventListener("click", () => showView
 // SETTINGS
 document.getElementById("save-settings").addEventListener("click", () => {
   const minWatchTime = parseInt(document.getElementById("min-watch-time").value, 10) || 0;
+  const resetTime = document.getElementById("reset-time").value || "05:00";
   browser.runtime.sendMessage({ 
     type: "updateSettings", 
-    settings: { minWatchTime } 
+    settings: { minWatchTime, resetTime } 
   }).then(() => {
     const btn = document.getElementById("save-settings");
     const originalText = btn.textContent;

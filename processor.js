@@ -83,7 +83,12 @@ const processAndSaveStats = async (tabMap) => {
         channelStats[ch].sessionTime += (meta.sessionTime || 0);
         channelStats[ch].watchTime += (meta.watchTime || 0);
         channelStats[ch].count += 1;
-        if (meta.tabId) channelStats[ch].tabs.push({ title: meta.title, tabId: meta.tabId, isLive: true });
+        if (meta.tabId) channelStats[ch].tabs.push({ 
+          title: meta.title, 
+          tabId: meta.tabId, 
+          isLive: true,
+          isPlaying: !!meta.isPlaying 
+        });
 
         const cleanChannel = ch.toLowerCase().replace(/\s+/g, "");
         const cleanTitle = (meta.title || "").toLowerCase().replace(/\s+/g, "");
@@ -105,7 +110,12 @@ const processAndSaveStats = async (tabMap) => {
           tagStats[tag].watchTime += (meta.watchTime || 0);
           tagStats[tag].count += 1;
           tagStats[tag].channels.add(ch);
-          if (meta.tabId) tagStats[tag].tabs.push({ title: meta.title, tabId: meta.tabId, isLive: true });
+          if (meta.tabId) tagStats[tag].tabs.push({ 
+            title: meta.title, 
+            tabId: meta.tabId, 
+            isLive: true,
+            isPlaying: !!meta.isPlaying 
+          });
         });
       }
     });
@@ -142,6 +152,11 @@ const processAndSaveStats = async (tabMap) => {
   const combinedEntries = [...historyLog, ...progressingOpenEntries];
   const historyTotals = processEntries(combinedEntries, "watchTime");
 
+  // 2.5 Today's Stats
+  const resetThreshold = getMostRecentResetTime(settings.resetTime || "05:00");
+  const todayHistory = historyLog.filter(e => e.timestamp >= resetThreshold);
+  const todayTotals = processEntries([...todayHistory, ...openEntries], "watchTime");
+
   // 3. Histogram Data
   const now = new Date();
   const histogram = {};
@@ -177,6 +192,7 @@ const processAndSaveStats = async (tabMap) => {
     isScanning: false,
     tabMap: tabMap,
     youtubeTotals: liveTotals,
+    todayTotals: todayTotals,
     historyTotals: historyTotals,
     histogramData: histogram,
     storageSizeKB: storageSizeKB,

@@ -53,6 +53,7 @@ const sendUpdate = () => {
       type: "tabUpdate",
       data: {
         title: document.title,
+        url: window.location.href,
         duration: duration,
         currentTime: currentTime,
         channel: getChannelName(),

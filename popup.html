@@ -23,6 +23,12 @@
       <div class="stat-item"><span class="stat-label">Unknown:</span> <span class="stat-value" id="unknown-count">0</span></div>
     </div>
 
+    <div style="font-size: 11px; color: #9ca3af; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Today's Totals</div>
+    <div class="stats-container">
+      <div class="stat-item"><span class="stat-label">Watch Time:</span> <span class="stat-value" id="today-watch">0:00</span></div>
+      <div class="stat-item"><span class="stat-label">Site Time:</span> <span class="stat-value" id="today-session">0:00</span></div>
+    </div>
+
     <div class="leaderboard-header">Top Open Tabs (By Duration)</div>
     <ul id="live-leaderboard" class="leaderboard"></ul>
     <button id="refresh">Refresh & Rescan Tabs</button>
@@ -58,6 +64,14 @@
       <div class="input-desc">Videos watched less than this aren't saved to history (unless shorter & watched fully).</div>
       <div class="input-row">
         <input type="number" id="min-watch-time" min="0" step="1" value="30">
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <label for="reset-time">Daily Reset Time</label>
+      <div class="input-desc">When the "Today's Totals" counter resets (e.g., 05:00 AM).</div>
+      <div class="input-row">
+        <input type="time" id="reset-time" value="05:00">
         <button id="save-settings" class="save-btn">Save Settings</button>
       </div>
     </div>

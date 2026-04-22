@@ -18,3 +18,16 @@ const formatDuration = (s) => {
   if (h > 0) return `${h}h ${m}m ${sec}s`;
   return `${m}m ${sec}s`;
 };
+
+const getMostRecentResetTime = (resetTimeStr) => {
+  if (!resetTimeStr) resetTimeStr = "05:00";
+  const [hours, minutes] = resetTimeStr.split(':').map(Number);
+  const now = new Date();
+  const reset = new Date(now);
+  reset.setHours(hours, minutes, 0, 0);
+  // If the calculated reset time is in the future, the most recent one was yesterday
+  if (reset > now) {
+    reset.setDate(reset.getDate() - 1);
+  }
+  return reset.getTime();
+};

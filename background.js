@@ -9,7 +9,65 @@ let settings = { minWatchTime: 30 };
 browser.storage.local.get(["tabMap", "settings"]).then(res => {
   if (res.tabMap) tabMap = res.tabMap;
   if (res.settings) settings = { ...settings, ...res.settings };
+  checkAndPerformReset();
 });
+
+// Helper to check if a tab should be saved to history
+const isWatchedEnough = (entry) => {
+  const isWatchedEnoughTime = entry.watchTime >= settings.minWatchTime;
+  const isShortButWatchedFully = entry.duration > 0 && 
+                                entry.duration < settings.minWatchTime && 
+                                (entry.watchTime >= entry.duration * 0.9 || entry.currentTime >= entry.duration * 0.9);
+  return isWatchedEnoughTime || isShortButWatchedFully;
+};
+
+// Helper to add entry to historyLog
+const addToHistory = async (data) => {
+  try {
+    const res = await browser.storage.local.get("historyLog");
+    const historyLog = res.historyLog || [];
+    historyLog.push(data);
+    await browser.storage.local.set({ historyLog });
+  } catch (e) {
+    console.error("Failed to save history:", e);
+  }
+};
+
+// Daily Reset Logic
+async function checkAndPerformReset() {
+  const storage = await browser.storage.local.get(["settings", "lastResetTimestamp"]);
+  const resetTimeStr = storage.settings?.resetTime || "05:00";
+  const lastProcessedReset = storage.lastResetTimestamp || 0;
+  
+  const currentResetThreshold = getMostRecentResetTime(resetTimeStr);
+  
+  if (lastProcessedReset < currentResetThreshold) {
+    console.log("Crossing daily reset threshold. Archiving open tabs...");
+    
+    // Archive currently open tabs to history as they were at the threshold
+    for (const tabId in tabMap) {
+      const entry = tabMap[tabId];
+      if (entry.watchTime > 0 || entry.sessionTime > 0) {
+        const archivedEntry = {
+          ...entry,
+          timestamp: currentResetThreshold - 1 // Just before the reset
+        };
+        delete archivedEntry.tabId;
+        
+        if (isWatchedEnough(archivedEntry)) {
+          await addToHistory(archivedEntry);
+        }
+        
+        // Reset the tab's counters for the new day
+        tabMap[tabId].sessionTime = 0;
+        tabMap[tabId].watchTime = 0;
+      }
+    }
+    
+    await browser.storage.local.set({ lastResetTimestamp: currentResetThreshold });
+    processAndSaveStats(tabMap);
+  }
+}
 
 // Helper to check if a tab is the active one in the focused window
 const isTabActiveAndFocused = async (tabId, windowId) => {
@@ -91,20 +149,49 @@ browser.runtime.onMessage.addListener(async (m, sender) => {
   
   if (m.type === "heartbeat" && sender.tab) {
     const tabId = sender.tab.id;
+    await checkAndPerformReset();
+    
+    const now = Date.now();
+    const existing = tabMap[tabId];
+
+    if (existing) {
+      // 1. NAVIGATION DETECTION (Backup for tabUpdate)
+      if (existing.url && existing.url !== m.data.url) {
+        if (isWatchedEnough(existing)) {
+          console.log("Navigation detected in heartbeat. Archiving:", existing.title);
+          addToHistory({ ...existing, timestamp: now });
+        }
+        existing.url = m.data.url;
+        existing.sessionTime = 0;
+        existing.watchTime = 0;
+      }
+
+      // 2. DOUBLE-HEARTBEAT PROTECTION
+      // If we got a heartbeat too recently, don't increment time
+      const timeSinceLast = now - (existing.lastHeartbeat || 0);
+      if (timeSinceLast < (HEARTBEAT_INTERVAL * 1000) - 500) {
+        return; 
+      }
+      existing.lastHeartbeat = now;
+    }
+
     if (!tabMap[tabId]) {
       tabMap[tabId] = { 
         tabId: tabId,
+        url: m.data.url,
         duration: 0, 
         currentTime: 0,
         channel: "Unknown Channel", 
         title: m.data.title, 
         tags: [], 
         sessionTime: 0, 
-        watchTime: 0 
+        watchTime: 0,
+        lastHeartbeat: now
       };
     }
 
     tabMap[tabId].currentTime = m.data.currentTime;
+    tabMap[tabId].isPlaying = !!m.data.isPlaying;
     const isActive = await isTabActiveAndFocused(tabId, sender.tab.windowId);
     if (isActive) {
       tabMap[tabId].sessionTime += HEARTBEAT_INTERVAL;
@@ -117,8 +204,25 @@ browser.runtime.onMessage.addListener(async (m, sender) => {
 
   if (m.type === "tabUpdate" && sender.tab) {
 	  const existing = tabMap[sender.tab.id];
+    
+    // NAVIGATION DETECTION
+    // If we already have data for this tab, but the URL changed, archive the old one
+    if (existing && existing.url && existing.url !== sender.tab.url) {
+      if (isWatchedEnough(existing)) {
+        console.log("Navigation detected. Archiving previous video:", existing.title);
+        addToHistory({
+          ...existing,
+          timestamp: Date.now()
+        });
+      }
+      // Reset counters for the new video
+      existing.sessionTime = 0;
+      existing.watchTime = 0;
+    }
+
 	  const newEntry = { 
 	        tabId: sender.tab.id,
+          url: sender.tab.url,
 	        duration: m.data.duration, 
           currentTime: m.data.currentTime,
 	        channel: m.data.channel, 
@@ -156,28 +260,13 @@ browser.tabs.onRemoved.addListener(async (tabId) => {
     const entry = tabMap[tabId];
     const { tabId: _, ...dataWithoutTabId } = entry;
     
-    // THRESHOLD LOGIC
-    // 1. Minimum watch time met
-    // 2. OR video is shorter than threshold and was watched fully (>= 90%)
-    const isWatchedEnough = entry.watchTime >= settings.minWatchTime;
-    const isShortButWatchedFully = entry.duration > 0 && 
-                                  entry.duration < settings.minWatchTime && 
-                                  (entry.watchTime >= entry.duration * 0.9 || entry.currentTime >= entry.duration * 0.9);
+    const dataToSave = {
+      ...dataWithoutTabId,
+      timestamp: Date.now()
+    };
 
-    if (isWatchedEnough || isShortButWatchedFully) {
-      const closedTabData = {
-        ...dataWithoutTabId,
-        timestamp: Date.now()
-      };
-
-      try {
-        const res = await browser.storage.local.get("historyLog");
-        const historyLog = res.historyLog || [];
-        historyLog.push(closedTabData);
-        await browser.storage.local.set({ historyLog });
-      } catch (e) {
-        console.error("Failed to save history:", e);
-      }
+    if (isWatchedEnough(entry)) {
+      await addToHistory(dataToSave);
     } else {
       console.log("Tab removed but did not meet watch time threshold:", entry.title);
     }
