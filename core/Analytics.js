@@ -16,7 +16,7 @@ window.YTA.Core.Analytics = {
     let tagStats = {};     
 
     entries.forEach(meta => {
-      if (meta && (meta.duration > 0 || meta.watchTime > 0)) {
+      if (meta && (meta.duration > 0 || meta.watchTime > 0 || meta.sessionTime > 0)) {
         totalSeconds += (meta.duration || 0);
         totalSession += (meta.sessionTime || 0);
         totalWatch += (meta.watchTime || 0);
@@ -108,7 +108,7 @@ window.YTA.Core.Analytics = {
       knownCount,
       unknownCount,
       leaderboard: leaderboard.sort((a, b) => b[sortField] - a[sortField]).slice(0, 25),
-      uniqueChannels: Object.keys(channelStats).length,
+      uniqueChannels: Object.keys(channelStats).filter(name => name !== "Unknown Channel").length,
       uniqueTags: Object.keys(tagStats).length
     };
   },

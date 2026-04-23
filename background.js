@@ -19,6 +19,13 @@ browser.runtime.onMessage.addListener(async (m, sender) => {
   if (m.type === "updateSettings") {
     window.YTA.State.settings = { ...window.YTA.State.settings, ...m.settings };
     await browser.storage.local.set({ settings: window.YTA.State.settings });
+    
+    // Broadcast new settings to all YouTube tabs so they can update heartbeat intervals
+    const tabs = await browser.tabs.query({ url: ["*://*.youtube.com/*", "*://youtu.be/*"] });
+    tabs.forEach(t => {
+      browser.tabs.sendMessage(t.id, { type: "settingsUpdated", settings: window.YTA.State.settings }).catch(() => {});
+    });
+
     // Trigger a cache update to reflect new settings if needed
     const res = await browser.storage.local.get("historyLog");
     window.YTA.Shell.Cache.update(res.historyLog || [], Object.values(window.YTA.State.tabMap));

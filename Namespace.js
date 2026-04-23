@@ -6,6 +6,6 @@ window.YTA = {
   Popup: {},
   State: {
     tabMap: {},
-    settings: { minWatchTime: 30, resetTime: "05:00" }
+    settings: { minWatchTime: 30, resetTime: "05:00", heartbeatInterval: 1 }
   }
 };

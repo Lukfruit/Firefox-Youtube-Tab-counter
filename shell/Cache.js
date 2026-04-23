@@ -7,7 +7,7 @@ window.YTA.Shell.Cache = {
    * Updates cached stats based on current history and tabs
    */
   update: async function(historyLog, tabMapEntries) {
-    const progressingOpen = tabMapEntries.filter(e => e.watchTime > 0);
+    const progressingOpen = tabMapEntries.filter(e => e.watchTime > 0 || e.sessionTime > 0);
     
     const histogramData = window.YTA.Core.Analytics.generateHistogram(historyLog, progressingOpen);
     

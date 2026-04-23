@@ -44,43 +44,53 @@ const getTags = () => {
 
 // The Live Reporter
 const sendUpdate = () => {
-  const duration = getDurationSeconds();
+  const duration = getDurationSeconds() || 0;
   const video = document.querySelector("video");
-  const currentTime = video ? Math.floor(video.currentTime) : 0;
-  
-  if (duration) {
-    browser.runtime.sendMessage({
-      type: "tabUpdate",
-      data: {
-        title: document.title,
-        url: window.location.href,
-        duration: duration,
-        currentTime: currentTime,
-        channel: getChannelName(),
-        tags: getTags()
-      }
-    });
-  }
-};
-
-// Heartbeat system: Sends status every 5s to track active time
-setInterval(() => {
-  const video = document.querySelector("video");
-  const isPlaying = video && !video.paused && !video.ended && video.readyState > 2;
   const currentTime = video ? Math.floor(video.currentTime) : 0;
   
   browser.runtime.sendMessage({
-    type: "heartbeat",
+    type: "tabUpdate",
     data: {
-      isPlaying: isPlaying,
+      title: document.title,
+      url: window.location.href,
+      duration: duration,
       currentTime: currentTime,
-      title: document.title, // Keep title updated for background tracking
-      url: window.location.href
+      channel: getChannelName(),
+      tags: getTags()
     }
-  }).catch(() => {
-    // Background script might be reloaded or unavailable
   });
-}, 5000);
+};
+
+let heartbeatIntervalId = null;
+
+const startHeartbeat = (intervalSeconds) => {
+  if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
+  
+  const ms = (intervalSeconds || 1) * 1000;
+  heartbeatIntervalId = setInterval(() => {
+    const video = document.querySelector("video");
+    const isPlaying = video && !video.paused && !video.ended && video.readyState > 2;
+    const currentTime = video ? Math.floor(video.currentTime) : 0;
+    
+    browser.runtime.sendMessage({
+      type: "heartbeat",
+      data: {
+        isPlaying: isPlaying,
+        currentTime: currentTime,
+        title: document.title, // Keep title updated for background tracking
+        url: window.location.href
+      }
+    }).catch(() => {
+      // Background script might be reloaded or unavailable
+    });
+  }, ms);
+};
+
+// Initial start: fetch settings or default to 1s as requested
+browser.storage.local.get("settings").then(res => {
+  const interval = res.settings?.heartbeatInterval || 1;
+  startHeartbeat(interval);
+});
 
 // 1. Send update when the page finishes loading
 if (document.readyState === 'complete') {
@@ -114,5 +124,9 @@ browser.runtime.onMessage.addListener((message) => {
       title: document.title,
       tags: getTags()
     });
+  }
+
+  if (message?.type === "settingsUpdated") {
+    startHeartbeat(message.settings?.heartbeatInterval);
   }
 });

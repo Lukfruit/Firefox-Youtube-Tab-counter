@@ -4,7 +4,6 @@
  */
 window.YTA.Background.Tracker = {
   isScanning: false,
-  HEARTBEAT_INTERVAL: 5,
 
   /**
    * Initializes the tracker and starts daily reset checks
@@ -72,8 +71,9 @@ window.YTA.Background.Tracker = {
       }
 
       // Throttling protection
+      const interval = window.YTA.State.settings.heartbeatInterval || 1;
       const timeSinceLast = now - (existing.lastHeartbeat || 0);
-      if (timeSinceLast < (this.HEARTBEAT_INTERVAL * 1000) - 500) return;
+      if (timeSinceLast < (interval * 1000) - 500) return;
     }
 
     const tabData = window.YTA.Core.Validation.cleanTabEntry({
@@ -89,8 +89,9 @@ window.YTA.Background.Tracker = {
     const isActive = win.focused && activeTab && activeTab.id === tabId;
 
     if (isActive) {
-      tabData.sessionTime += this.HEARTBEAT_INTERVAL;
-      if (data.isPlaying) tabData.watchTime += this.HEARTBEAT_INTERVAL;
+      const interval = window.YTA.State.settings.heartbeatInterval || 1;
+      tabData.sessionTime += interval;
+      if (data.isPlaying) tabData.watchTime += interval;
     }
 
     window.YTA.State.tabMap[tabId] = tabData;

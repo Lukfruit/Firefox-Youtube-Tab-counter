@@ -8,7 +8,7 @@ window.YTA.Core.Logic = {
    */
   isWatchedEnough: (entry, settings) => {
     const minTime = settings?.minWatchTime || 30;
-    const isWatchedEnoughTime = entry.watchTime >= minTime;
+    const isWatchedEnoughTime = entry.watchTime >= minTime || entry.sessionTime >= minTime;
     
     const isShortButWatchedFully = entry.duration > 0 && 
                                   entry.duration < minTime && 
