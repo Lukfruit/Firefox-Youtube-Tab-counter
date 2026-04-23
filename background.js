@@ -20,6 +20,9 @@ browser.runtime.onMessage.addListener(async (m, sender) => {
     window.YTA.State.settings = { ...window.YTA.State.settings, ...m.settings };
     await browser.storage.local.set({ settings: window.YTA.State.settings });
     
+    // Update idle detection interval
+    window.YTA.Background.Tracker.updateIdleDetection();
+    
     // Broadcast new settings to all YouTube tabs so they can update heartbeat intervals
     const tabs = await browser.tabs.query({ url: ["*://*.youtube.com/*", "*://youtu.be/*"] });
     tabs.forEach(t => {

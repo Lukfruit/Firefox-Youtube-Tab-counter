@@ -101,6 +101,7 @@ window.YTA.Popup.Controller = {
       document.getElementById("min-watch-time").value = data.settings.minWatchTime || 30;
       document.getElementById("reset-time").value = data.settings.resetTime || "05:00";
       document.getElementById("heartbeat-interval").value = data.settings.heartbeatInterval || 1;
+      document.getElementById("afk-timeout").value = data.settings.afkTimeout || 15;
     }
   },
 
@@ -132,9 +133,10 @@ window.YTA.Popup.Controller = {
     const minWatchTime = parseInt(document.getElementById("min-watch-time").value, 10) || 0;
     const resetTime = document.getElementById("reset-time").value || "05:00";
     const heartbeatInterval = parseInt(document.getElementById("heartbeat-interval").value, 10) || 1;
+    const afkTimeout = parseInt(document.getElementById("afk-timeout").value, 10) || 15;
     browser.runtime.sendMessage({ 
       type: "updateSettings", 
-      settings: { minWatchTime, resetTime, heartbeatInterval } 
+      settings: { minWatchTime, resetTime, heartbeatInterval, afkTimeout } 
     }).then(() => {
       const btn = document.getElementById("save-settings");
       btn.textContent = "Saved!";

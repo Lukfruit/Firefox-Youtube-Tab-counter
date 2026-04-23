@@ -4,6 +4,7 @@
  */
 window.YTA.Background.Tracker = {
   isScanning: false,
+  isSystemIdle: false,
 
   /**
    * Initializes the tracker and starts daily reset checks
@@ -13,8 +14,27 @@ window.YTA.Background.Tracker = {
     await window.YTA.Shell.Storage.load();
     this.checkAndPerformReset();
     
+    // Initial idle state check
+    this.updateIdleDetection();
+    browser.idle.onStateChanged.addListener((state) => {
+      this.isSystemIdle = (state !== "active");
+      console.log("System idle state changed:", state);
+    });
+
     // Initial scan to catch any existing tabs
     this.refreshTotals();
+  },
+
+  /**
+   * Updates the browser idle detection interval based on settings
+   */
+  updateIdleDetection: function() {
+    const timeout = window.YTA.State.settings.afkTimeout || 15;
+    // browser.idle requires interval in seconds, min 15.
+    browser.idle.setDetectionInterval(Math.max(15, timeout));
+    browser.idle.queryState(timeout, (state) => {
+      this.isSystemIdle = (state !== "active");
+    });
   },
 
   /**
@@ -90,8 +110,18 @@ window.YTA.Background.Tracker = {
 
     if (isActive) {
       const interval = window.YTA.State.settings.heartbeatInterval || 1;
-      tabData.sessionTime += interval;
-      if (data.isPlaying) tabData.watchTime += interval;
+      
+      // We only increment if:
+      // 1. A video is actively playing (overrides AFK)
+      // OR
+      // 2. The user is active (not system idle AND not tab idle)
+      const isUserReallyActive = !this.isSystemIdle && data.isUserActive !== false;
+      const shouldIncrement = data.isPlaying || isUserReallyActive;
+
+      if (shouldIncrement) {
+        tabData.sessionTime += interval;
+        if (data.isPlaying) tabData.watchTime += interval;
+      }
     }
 
     window.YTA.State.tabMap[tabId] = tabData;

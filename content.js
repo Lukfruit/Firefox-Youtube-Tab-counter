@@ -62,6 +62,17 @@ const sendUpdate = () => {
 };
 
 let heartbeatIntervalId = null;
+let lastActivity = Date.now();
+let afkTimeoutSeconds = 15;
+
+const updateActivity = () => {
+  lastActivity = Date.now();
+};
+
+// Listen for activity: mouse, keyboard, scroll, wheel
+['mousedown', 'mousemove', 'keydown', 'scroll', 'wheel', 'touchstart'].forEach(evt => {
+  window.addEventListener(evt, updateActivity, { passive: true });
+});
 
 const startHeartbeat = (intervalSeconds) => {
   if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
@@ -69,13 +80,18 @@ const startHeartbeat = (intervalSeconds) => {
   const ms = (intervalSeconds || 1) * 1000;
   heartbeatIntervalId = setInterval(() => {
     const video = document.querySelector("video");
-    const isPlaying = video && !video.paused && !video.ended && video.readyState > 2;
+    const isVideoPage = window.location.pathname.startsWith('/watch') || window.location.pathname.startsWith('/shorts');
+    const isPlaying = isVideoPage && video && !video.paused && !video.ended && video.readyState > 2;
     const currentTime = video ? Math.floor(video.currentTime) : 0;
     
+    // Tab-level AFK check
+    const isUserActive = (Date.now() - lastActivity) < (afkTimeoutSeconds * 1000);
+
     browser.runtime.sendMessage({
       type: "heartbeat",
       data: {
         isPlaying: isPlaying,
+        isUserActive: isUserActive,
         currentTime: currentTime,
         title: document.title, // Keep title updated for background tracking
         url: window.location.href
@@ -89,6 +105,7 @@ const startHeartbeat = (intervalSeconds) => {
 // Initial start: fetch settings or default to 1s as requested
 browser.storage.local.get("settings").then(res => {
   const interval = res.settings?.heartbeatInterval || 1;
+  afkTimeoutSeconds = res.settings?.afkTimeout || 15;
   startHeartbeat(interval);
 });
 
@@ -127,6 +144,7 @@ browser.runtime.onMessage.addListener((message) => {
   }
 
   if (message?.type === "settingsUpdated") {
+    afkTimeoutSeconds = message.settings?.afkTimeout || 15;
     startHeartbeat(message.settings?.heartbeatInterval);
   }
 });
