@@ -71,7 +71,8 @@ window.YTA.Popup.ChartManager = {
                 const val = ctx.raw;
                 const h = Math.floor(val / 60);
                 const m = Math.round(val % 60);
-                return ` ${ctx.dataset.label}: ${h}h ${m}m`;
+                const pad = (n) => String(n).padStart(2, '0');
+                return ` ${ctx.dataset.label}: ${h}h ${pad(m)}m`;
               }
             }
           }

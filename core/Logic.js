@@ -31,5 +31,91 @@ window.YTA.Core.Logic = {
     }
 
     return threshold.getTime();
+  },
+
+  /**
+   * Logic for processing the daily reset
+   */
+  processDailyReset: (tabMap, lastReset, resetTimeSetting, settings) => {
+    const currentResetThreshold = window.YTA.Core.Logic.getMostRecentResetTime(resetTimeSetting);
+    if (lastReset >= currentResetThreshold) return null;
+
+    const newTabMap = { ...tabMap };
+    const archiveEntries = [];
+
+    for (const tabId in newTabMap) {
+      const entry = newTabMap[tabId];
+      if (entry.watchTime > 0 || entry.sessionTime > 0) {
+        const archivedEntry = { ...entry, timestamp: currentResetThreshold - 1 };
+        if (window.YTA.Core.Logic.isWatchedEnough(archivedEntry, settings)) {
+          archiveEntries.push(archivedEntry);
+        }
+        // Reset counters for the new day
+        newTabMap[tabId] = { ...entry, sessionTime: 0, watchTime: 0 };
+      }
+    }
+
+    return { newTabMap, archiveEntries, newTimestamp: currentResetThreshold };
+  },
+
+  /**
+   * Logic for updating tab state from a heartbeat
+   */
+  updateTabState: (existing, data, settings, systemState) => {
+    const now = Date.now();
+    let tabData = { ...existing };
+    let shouldArchive = null;
+
+    if (existing && existing.url && existing.url !== data.url) {
+      if (window.YTA.Core.Logic.isWatchedEnough(existing, settings)) {
+        shouldArchive = { ...existing, timestamp: now };
+      }
+      tabData.url = data.url;
+      tabData.sessionTime = 0;
+      tabData.watchTime = 0;
+    }
+
+    const interval = settings.heartbeatInterval || 1;
+    const timeSinceLast = now - (tabData.lastHeartbeat || 0);
+    // Throttling check
+    if (existing && timeSinceLast < (interval * 1000) - 500) return { throttled: true };
+
+    tabData = window.YTA.Core.Validation.cleanTabEntry({
+      ...tabData,
+      ...data,
+      lastHeartbeat: now
+    });
+
+    if (systemState.isActiveTab) {
+      const isUserReallyActive = !systemState.isSystemIdle && data.isUserActive !== false;
+      const shouldIncrement = data.isPlaying || isUserReallyActive;
+
+      if (shouldIncrement) {
+        tabData.sessionTime += interval;
+        if (data.isPlaying) tabData.watchTime += interval;
+      }
+    }
+
+    return { tabData, shouldArchive, progressed: systemState.isActiveTab };
+  },
+
+  /**
+   * Logic for calculating recommended delay based on failure rates
+   */
+  calculateRecommendedDelay: (stats) => {
+    if (!stats || stats.totalRequests === 0) return 1000;
+    const failureRate = stats.error429Count / stats.totalRequests;
+    if (failureRate === 0) return Math.max(100, Math.round(stats.usedDelay * 0.9));
+    return Math.round(stats.usedDelay / failureRate);
+  },
+
+  /**
+   * Logic to decide if a tab needs re-scanning
+   */
+  isTabFresh: (tabData) => {
+    if (!tabData) return false;
+    const isFresh = tabData.lastHeartbeat && (Date.now() - tabData.lastHeartbeat < 10 * 60 * 1000);
+    const hasMetadata = tabData.channel && tabData.channel !== "Unknown Channel";
+    return !!(isFresh && hasMetadata);
   }
 };

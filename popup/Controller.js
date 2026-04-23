@@ -102,6 +102,28 @@ window.YTA.Popup.Controller = {
       document.getElementById("reset-time").value = data.settings.resetTime || "05:00";
       document.getElementById("heartbeat-interval").value = data.settings.heartbeatInterval || 1;
       document.getElementById("afk-timeout").value = data.settings.afkTimeout || 15;
+      document.getElementById("scanner-delay").value = data.settings.scannerDelay || 1000;
+    }
+
+    // Update scanner recommendation
+    const stats = data.lastScanStats;
+    const recEl = document.getElementById("scan-recommendation");
+    if (recEl) {
+      if (stats && stats.totalRequests > 0) {
+        const failureRate = stats.error429Count / stats.totalRequests;
+        if (failureRate > 0) {
+          // User formula: recommended = usedDelay / failureRate
+          const recDelay = Math.round(stats.usedDelay / failureRate);
+          recEl.textContent = `Recommended: ${recDelay}ms (Last failure rate: ${Math.round(failureRate * 100)}%)`;
+          recEl.style.color = "#f87171"; // Reddish
+        } else {
+          recEl.textContent = "Recommended: Current speed is optimal (0% failures)";
+          recEl.style.color = "#10b981"; // Green
+        }
+      } else {
+        recEl.textContent = "Recommended: Run a scan to see data";
+        recEl.style.color = "#60a5fa";
+      }
     }
   },
 
@@ -134,9 +156,10 @@ window.YTA.Popup.Controller = {
     const resetTime = document.getElementById("reset-time").value || "05:00";
     const heartbeatInterval = parseInt(document.getElementById("heartbeat-interval").value, 10) || 1;
     const afkTimeout = parseInt(document.getElementById("afk-timeout").value, 10) || 15;
+    const scannerDelay = parseInt(document.getElementById("scanner-delay").value, 10) || 1000;
     browser.runtime.sendMessage({ 
       type: "updateSettings", 
-      settings: { minWatchTime, resetTime, heartbeatInterval, afkTimeout } 
+      settings: { minWatchTime, resetTime, heartbeatInterval, afkTimeout, scannerDelay } 
     }).then(() => {
       const btn = document.getElementById("save-settings");
       btn.textContent = "Saved!";

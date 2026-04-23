@@ -1,134 +1,83 @@
 // background/Tracker.js
 /**
- * Background Orchestrator: Manages tab state and events.
+ * Background Tracker: Central orchestrator for tab lifecycle and events.
  */
 window.YTA.Background.Tracker = {
-  isScanning: false,
-  isSystemIdle: false,
-
   /**
-   * Initializes the tracker and starts daily reset checks
+   * Initializes the tracker
    */
   start: async function() {
-    console.log("Tracker starting...");
+    console.log("[Tracker] Starting...");
     await window.YTA.Shell.Storage.load();
-    this.checkAndPerformReset();
+    await this.checkAndPerformReset();
     
-    // Initial idle state check
-    this.updateIdleDetection();
-    browser.idle.onStateChanged.addListener((state) => {
-      this.isSystemIdle = (state !== "active");
-      console.log("System idle state changed:", state);
-    });
-
-    // Initial scan to catch any existing tabs
-    this.refreshTotals();
+    window.YTA.Background.IdleManager.init();
+    
+    // Initial scan
+    window.YTA.Background.Scanner.refreshTotals();
   },
 
   /**
-   * Updates the browser idle detection interval based on settings
-   */
-  updateIdleDetection: function() {
-    const timeout = window.YTA.State.settings.afkTimeout || 15;
-    // browser.idle requires interval in seconds, min 15.
-    browser.idle.setDetectionInterval(Math.max(15, timeout));
-    browser.idle.queryState(timeout, (state) => {
-      this.isSystemIdle = (state !== "active");
-    });
-  },
-
-  /**
-   * Checks if we've crossed the daily reset threshold and archives open tabs
+   * Orchestrates the daily reset check
    */
   checkAndPerformReset: async function() {
-    const storage = await browser.storage.local.get(["lastResetTimestamp"]);
-    const lastProcessedReset = storage.lastResetTimestamp || 0;
-    const currentResetThreshold = window.YTA.Core.Logic.getMostRecentResetTime(window.YTA.State.settings.resetTime);
+    const storage = await browser.storage.local.get(["lastResetTimestamp", "historyLog"]);
+    const result = window.YTA.Core.Logic.processDailyReset(
+      window.YTA.State.tabMap, 
+      storage.lastResetTimestamp || 0,
+      window.YTA.State.settings.resetTime,
+      window.YTA.State.settings
+    );
 
-    if (lastProcessedReset < currentResetThreshold) {
-      console.log("Daily reset threshold crossed. Archiving...");
-      const tabMap = window.YTA.State.tabMap;
+    if (result) {
+      console.log("[Tracker] Daily reset threshold crossed. Archiving...");
+      const { newTabMap, archiveEntries, newTimestamp } = result;
       
-      for (const tabId in tabMap) {
-        const entry = tabMap[tabId];
-        if (entry.watchTime > 0 || entry.sessionTime > 0) {
-          const archivedEntry = { ...entry, timestamp: currentResetThreshold - 1 };
-          if (window.YTA.Core.Logic.isWatchedEnough(archivedEntry, window.YTA.State.settings)) {
-            await window.YTA.Shell.Storage.archiveEntry(archivedEntry);
-          }
-          // Reset counters for the new day
-          tabMap[tabId].sessionTime = 0;
-          tabMap[tabId].watchTime = 0;
-        }
+      for (const entry of archiveEntries) {
+        await window.YTA.Shell.Storage.archiveEntry(entry);
       }
       
-      await browser.storage.local.set({ lastResetTimestamp: currentResetThreshold });
-      await window.YTA.Shell.Storage.saveTabMap(tabMap);
+      await browser.storage.local.set({ lastResetTimestamp: newTimestamp });
+      await window.YTA.Shell.Storage.saveTabMap(newTabMap);
       
       const res = await browser.storage.local.get("historyLog");
-      await window.YTA.Shell.Cache.update(res.historyLog || [], Object.values(tabMap));
+      await window.YTA.Shell.Cache.update(res.historyLog || [], Object.values(newTabMap));
     }
   },
 
   /**
-   * Processes a heartbeat from a content script
+   * Orchestrates heartbeat processing
    */
   handleHeartbeat: async function(tabId, windowId, data) {
     await this.checkAndPerformReset();
     
-    const now = Date.now();
-    let existing = window.YTA.State.tabMap[tabId];
-
-    if (existing) {
-      // Navigation detection
-      if (existing.url && existing.url !== data.url) {
-        if (window.YTA.Core.Logic.isWatchedEnough(existing, window.YTA.State.settings)) {
-          await window.YTA.Shell.Storage.archiveEntry({ ...existing, timestamp: now });
-        }
-        existing.url = data.url;
-        existing.sessionTime = 0;
-        existing.watchTime = 0;
-      }
-
-      // Throttling protection
-      const interval = window.YTA.State.settings.heartbeatInterval || 1;
-      const timeSinceLast = now - (existing.lastHeartbeat || 0);
-      if (timeSinceLast < (interval * 1000) - 500) return;
-    }
-
-    const tabData = window.YTA.Core.Validation.cleanTabEntry({
-      ...existing,
-      ...data,
-      tabId,
-      lastHeartbeat: now
-    });
-
-    // Check if focused
+    const existing = window.YTA.State.tabMap[tabId];
+    
+    // Determine system state
     const win = await browser.windows.get(windowId);
     const [activeTab] = await browser.tabs.query({ active: true, windowId: windowId });
-    const isActive = win.focused && activeTab && activeTab.id === tabId;
+    const isActiveTab = win.focused && activeTab && activeTab.id === tabId;
 
-    if (isActive) {
-      const interval = window.YTA.State.settings.heartbeatInterval || 1;
-      
-      // We only increment if:
-      // 1. A video is actively playing (overrides AFK)
-      // OR
-      // 2. The user is active (not system idle AND not tab idle)
-      const isUserReallyActive = !this.isSystemIdle && data.isUserActive !== false;
-      const shouldIncrement = data.isPlaying || isUserReallyActive;
-
-      if (shouldIncrement) {
-        tabData.sessionTime += interval;
-        if (data.isPlaying) tabData.watchTime += interval;
+    const result = window.YTA.Core.Logic.updateTabState(
+      existing, 
+      data, 
+      window.YTA.State.settings,
+      { 
+        isActiveTab, 
+        isSystemIdle: window.YTA.Background.IdleManager.isSystemIdle 
       }
+    );
+
+    if (result.throttled) return;
+
+    if (result.shouldArchive) {
+      await window.YTA.Shell.Storage.archiveEntry(result.shouldArchive);
     }
 
-    window.YTA.State.tabMap[tabId] = tabData;
+    window.YTA.State.tabMap[tabId] = result.tabData;
     await window.YTA.Shell.Storage.saveTabMap(window.YTA.State.tabMap);
 
-    // If the tab just progressed, update the cache so the popup sees it
-    if (isActive) {
+    if (result.progressed) {
       const res = await browser.storage.local.get("historyLog");
       await window.YTA.Shell.Cache.update(res.historyLog || [], Object.values(window.YTA.State.tabMap));
     }
@@ -145,45 +94,6 @@ window.YTA.Background.Tracker = {
       }
       delete window.YTA.State.tabMap[tabId];
       await window.YTA.Shell.Storage.saveTabMap(window.YTA.State.tabMap);
-    }
-  },
-
-  /**
-   * Full scan of all YouTube tabs
-   */
-  refreshTotals: async function() {
-    if (this.isScanning) return;
-    this.isScanning = true;
-    try {
-      const tabs = await browser.tabs.query({ url: ["*://*.youtube.com/*", "*://youtu.be/*"] });
-      await browser.storage.local.set({ isScanning: true, totalToScan: tabs.length, currentScanned: 0 });
-
-      for (let i = 0; i < tabs.length; i++) {
-        const t = tabs[i];
-        let tabData = { ...window.YTA.State.tabMap[t.id], tabId: t.id, title: t.title, url: t.url };
-
-        try {
-          const res = await browser.tabs.sendMessage(t.id, { type: "getDuration" });
-          if (res) {
-            tabData = { ...tabData, ...res, duration: res.durationSeconds };
-          }
-        } catch (e) {
-          // Fallback to scraper if tab is asleep
-          if (!tabData.channel || tabData.channel === "Unknown Channel") {
-            const meta = await window.YTA.Shell.Scraper.fetchMetadata(t.url);
-            if (meta) tabData = { ...tabData, ...meta };
-          }
-        }
-
-        window.YTA.State.tabMap[t.id] = window.YTA.Core.Validation.cleanTabEntry(tabData);
-        await browser.storage.local.set({ currentScanned: i + 1 });
-      }
-      
-      const res = await browser.storage.local.get("historyLog");
-      await window.YTA.Shell.Cache.update(res.historyLog || [], Object.values(window.YTA.State.tabMap));
-    } finally {
-      this.isScanning = false;
-      await browser.storage.local.set({ isScanning: false });
     }
   }
 };

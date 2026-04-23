@@ -4,7 +4,7 @@
 // 1. Listeners
 browser.runtime.onMessage.addListener(async (m, sender) => { 
   if (m.type === "forceRefresh") {
-    window.YTA.Background.Tracker.refreshTotals();
+    window.YTA.Background.Scanner.refreshTotals();
   }
   
   if (m.type === "heartbeat" && sender.tab) {
@@ -21,7 +21,7 @@ browser.runtime.onMessage.addListener(async (m, sender) => {
     await browser.storage.local.set({ settings: window.YTA.State.settings });
     
     // Update idle detection interval
-    window.YTA.Background.Tracker.updateIdleDetection();
+    window.YTA.Background.IdleManager.updateInterval();
     
     // Broadcast new settings to all YouTube tabs so they can update heartbeat intervals
     const tabs = await browser.tabs.query({ url: ["*://*.youtube.com/*", "*://youtu.be/*"] });
@@ -45,6 +45,13 @@ browser.runtime.onInstalled.addListener(() => {
 
 browser.runtime.onStartup.addListener(() => {
   window.YTA.Background.Tracker.start();
+});
+
+browser.notifications.onClicked.addListener((id) => {
+  if (id === "yta-captcha" && window.YTA.Background.lastBlockedUrl) {
+    browser.tabs.create({ url: window.YTA.Background.lastBlockedUrl, active: true });
+    browser.notifications.clear(id);
+  }
 });
 
 // 2. Initialize

@@ -103,6 +103,16 @@
       <div class="input-desc">Pauses site tracking after this many seconds of inactivity (unless a video is playing). Min 15s.</div>
       <div class="input-row">
         <input type="number" id="afk-timeout" min="15" max="3600" step="5" value="15">
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <label for="scanner-delay">Scanner Delay (ms)</label>
+      <div class="input-desc">Wait time between processing tabs during a full scan. 
+        <span id="scan-recommendation" style="display:block; margin-top:4px; font-weight:bold; color:#60a5fa;">Recommended: Calculating...</span>
+      </div>
+      <div class="input-row">
+        <input type="number" id="scanner-delay" min="100" max="30000" step="100" value="1000">
         <button id="save-settings" class="save-btn">Save Settings</button>
       </div>
     </div>

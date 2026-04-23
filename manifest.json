@@ -1,24 +1,28 @@
 {
   "manifest_version": 2,
   "name": "YouTube Tab Analyzer",
-  "version": "1.1",
+  "version": "1.3",
   "description": "Analyzes YouTube tabs to track interests and watch time.",
   "browser_specific_settings": {
     "gecko": {
       "id": "tab-analyzer@lukfruit",
       "strict_min_version": "142.0",
       "data_collection_permissions": {
-        "required": ["none"]
+        "required": [
+          "none"
+        ]
       }
     }
   },
-  "icons": { "128": "icon.svg" },
+  "icons": {
+    "128": "icon.svg"
+  },
   "browser_action": {
     "default_icon": "icon.svg",
     "default_popup": "popup.html",
-	"default_title": "YouTube Tab Analyzer"
+    "default_title": "YouTube Tab Analyzer"
   },
-  "background": { 
+  "background": {
     "scripts": [
       "utils.js", 
       "Namespace.js", 
@@ -28,10 +32,21 @@
       "shell/Storage.js", 
       "shell/Scraper.js", 
       "shell/Cache.js", 
+      "background/IdleManager.js",
+      "background/Scanner.js",
       "background/Tracker.js", 
       "background.js"
     ] 
-  },
-  "content_scripts": [{ "js": ["utils.js", "content.js"], "matches": ["*://*.youtube.com/*"] }],
-  "permissions": ["tabs", "storage", "idle", "https://*.youtube.com/*"]
-}
+    },  "content_scripts": [
+    {
+      "js": [
+        "utils.js",
+        "content.js"
+      ],
+      "matches": [
+        "*://*.youtube.com/*"
+      ]
+    }
+  ],
+  "permissions": ["tabs", "storage", "idle", "notifications", "https://*.youtube.com/*"]
+  }

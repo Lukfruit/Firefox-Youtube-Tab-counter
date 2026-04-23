@@ -39,7 +39,7 @@ window.YTA.Popup.Renderer = {
 
       const arrow = document.createElement("span");
       arrow.className = `toggle-arrow ${isExpanded ? 'expanded' : ''}`;
-      arrow.innerHTML = hasTabs ? "&#9654;" : "";
+      arrow.textContent = hasTabs ? "▶" : "";
       entryHeader.appendChild(arrow);
 
       const rank = document.createElement("span");
