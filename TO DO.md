@@ -34,3 +34,11 @@ This document tracks planned features and UI/UX refinements for the extension.
     - Option A: Filter out entries with 0 watch time entirely.
     - Option B: Group them under a "Browsed but not Watched" section.
     - Option C: Ensure they are only archived if they meet the `minWatchTime` threshold.
+
+## Feature 7: Track how much the backlog grew/shrunk
+    
+## Bugs:
+ - history tab shows wrong number of watched video (like for via li for whatever reason i have like 21 videos watched, i think it double dips from active/open tabs or something)
+    - it seems that the app double counts a tab when you open an unloaded tab for the first time since X event. in both the live and the history tabs at that. For example: when i opened an unloaded tab the live version went from 10 to 11 tabs open and same went for the history tab (from 46 to 47)
+ - history tab doesn not change view times depending on format it always displays total times, it should switch between 30 days and 7 days segments
+ - tabs do not properly update when it's the same video tab but different video. i.e you watch a video and the next video is from recommendations, so effectivively you watched two videos in a single tab, the duration from both videos will be added to the first video's tags.
