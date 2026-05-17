@@ -63,7 +63,7 @@ window.YTA.Background.Scanner = {
         
         console.log(`[Scanner] Processing: ${t.title}`);
 
-        if (window.YTA.Core.Logic.isTabFresh(tabData)) {
+        if (window.YTA.Core.Logic.isTabFresh(tabData, t.url)) {
           console.log(`[Scanner] Skipping fetch (Metadata is fresh)`);
           await browser.storage.local.set({ currentScanned: i + 1 });
           continue;

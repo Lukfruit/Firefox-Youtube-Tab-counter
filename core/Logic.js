@@ -137,10 +137,23 @@ window.YTA.Core.Logic = {
   /**
    * Logic to decide if a tab needs re-scanning
    */
-  isTabFresh: (tabData) => {
-    if (!tabData) return false;
-    const isFresh = tabData.lastHeartbeat && (Date.now() - tabData.lastHeartbeat < 10 * 60 * 1000);
-    const hasMetadata = tabData.channel && tabData.channel !== "Unknown Channel";
-    return !!(isFresh && hasMetadata);
+  isTabFresh: (tabData, currentUrl) => {
+    if (!tabData || !currentUrl) return false;
+    
+    // 1. URL must match exactly
+    if (tabData.url !== currentUrl) return false;
+
+    const channel = tabData.channel || "";
+    const isVideoPage = currentUrl.includes("/watch") || currentUrl.includes("/shorts");
+    const hasSpecificMetadata = channel !== "Unknown Channel" && !channel.startsWith("YouTube (");
+    const hasDuration = typeof tabData.duration === 'number' && tabData.duration > 0;
+
+    // 2. If it's a video, we need full metadata. 
+    // If it's a home/search page, we just need the category.
+    if (isVideoPage) {
+      return !!(hasSpecificMetadata && hasDuration);
+    } else {
+      return !!(channel && channel !== "Unknown Channel");
+    }
   }
 };
