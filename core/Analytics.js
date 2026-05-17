@@ -107,7 +107,10 @@ window.YTA.Core.Analytics = {
       totalWatch,
       knownCount,
       unknownCount,
-      leaderboard: leaderboard.sort((a, b) => b[sortField] - a[sortField]).slice(0, 25),
+      leaderboard: leaderboard
+        .filter(item => item[sortField] > 0)
+        .sort((a, b) => b[sortField] - a[sortField])
+        .slice(0, 25),
       uniqueChannels: Object.keys(channelStats).filter(name => name !== "Unknown Channel").length,
       uniqueTags: Object.keys(tagStats).length
     };

@@ -11,6 +11,20 @@ const getDurationSeconds = () => {
 
 // Logic to identify channel name for the live report
 const getChannelName = () => {
+  const path = window.location.pathname;
+  const url = new URL(window.location.href);
+
+  // Categorize non-video pages as "YouTube" with sub-types
+  if (path === "/" || path === "/feed/trending") return "YouTube (Home)";
+  if (path === "/results") return "YouTube (Search)";
+  if (path.startsWith("/feed/subscriptions")) return "YouTube (Subscriptions)";
+  if (path.startsWith("/feed/library") || path.startsWith("/feed/history")) return "YouTube (Library/History)";
+  if (path.startsWith("/channel/") || path.startsWith("/@")) {
+    // If we are on a channel page but not a video, it's just browsing that channel
+    const channelName = document.querySelector("#channel-name #text")?.textContent?.trim();
+    return channelName ? `YouTube (Browsing ${channelName})` : "YouTube (Browsing Channel)";
+  }
+
   // 1. Try standard visible UI elements first
   const channelLink = document.querySelector("#upload-info #channel-name a, .ytp-ce-channel-title");
   if (channelLink && channelLink.textContent.trim()) {

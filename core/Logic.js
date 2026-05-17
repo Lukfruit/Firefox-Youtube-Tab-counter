@@ -70,15 +70,40 @@ window.YTA.Core.Logic = {
       if (window.YTA.Core.Logic.isWatchedEnough(existing, settings)) {
         shouldArchive = { ...existing, timestamp: now };
       }
+      // Reset for new video
       tabData.url = data.url;
       tabData.sessionTime = 0;
       tabData.watchTime = 0;
+      // Enter "Loading" state with a grace period
+      tabData.channel = "Unknown Channel";
+      tabData.tags = [];
+      tabData.duration = 0;
+      tabData.title = "Loading...";
+      tabData.metadataLoadingSince = now; 
     }
 
     const interval = settings.heartbeatInterval || 1;
     const timeSinceLast = now - (tabData.lastHeartbeat || 0);
     // Throttling check
     if (existing && timeSinceLast < (interval * 1000) - 500) return { throttled: true };
+
+    // Metadata Grace Period:
+    // If we just changed URL, ignore heartbeats until metadata (channel/duration) is provided,
+    // or until 5 seconds have passed. This prevents "Unknown Channel" spam during loading.
+    const isActuallyVideo = data.url.includes("/watch") || data.url.includes("/shorts");
+    const hasMetadata = data.channel && data.channel !== "Unknown Channel";
+    
+    if (tabData.metadataLoadingSince && (now - tabData.metadataLoadingSince < 5000)) {
+      if (isActuallyVideo && !hasMetadata) {
+        // Still waiting for video metadata, don't increment yet
+        return { throttled: true }; 
+      }
+    }
+    
+    // Clear the loading flag if we have metadata or timeout reached
+    if (hasMetadata || (tabData.metadataLoadingSince && now - tabData.metadataLoadingSince >= 5000)) {
+      delete tabData.metadataLoadingSince;
+    }
 
     tabData = window.YTA.Core.Validation.cleanTabEntry({
       ...tabData,

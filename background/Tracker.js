@@ -9,6 +9,7 @@ window.YTA.Background.Tracker = {
   start: async function() {
     console.log("[Tracker] Starting...");
     await window.YTA.Shell.Storage.load();
+    await window.YTA.Background.Scanner.cleanupStaleTabs();
     await this.checkAndPerformReset();
     
     window.YTA.Background.IdleManager.init();

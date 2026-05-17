@@ -17,8 +17,16 @@ window.YTA.Shell.Cache = {
     const todayHistory = historyLog.filter(e => e.timestamp >= resetThreshold);
     const todayTotals = window.YTA.Core.Analytics.processEntries([...todayHistory, ...progressingOpen], "watchTime");
 
-    // Also calculate full history totals
-    const historyTotals = window.YTA.Core.Analytics.processEntries([...historyLog, ...progressingOpen], "watchTime");
+    // Pre-calculate 7-day and 30-day history totals
+    const now = Date.now();
+    const threshold7 = now - (7 * 24 * 60 * 60 * 1000);
+    const threshold30 = now - (30 * 24 * 60 * 60 * 1000);
+
+    const history7 = historyLog.filter(e => e.timestamp >= threshold7);
+    const history30 = historyLog.filter(e => e.timestamp >= threshold30);
+
+    const historyTotals7 = window.YTA.Core.Analytics.processEntries([...history7, ...progressingOpen], "watchTime");
+    const historyTotals30 = window.YTA.Core.Analytics.processEntries([...history30, ...progressingOpen], "watchTime");
 
     // Also calculate live totals for the "Live Now" tab
     const youtubeTotals = window.YTA.Core.Analytics.processEntries(tabMapEntries, "duration");
@@ -30,7 +38,8 @@ window.YTA.Shell.Cache = {
       youtubeTotals,
       histogramData,
       todayTotals,
-      historyTotals,
+      historyTotals7,
+      historyTotals30,
       storageSizeKB
     });
     

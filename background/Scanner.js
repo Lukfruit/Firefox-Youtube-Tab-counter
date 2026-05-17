@@ -7,10 +7,44 @@ window.YTA.Background.Scanner = {
   lastScanStats: { totalRequests: 0, error429Count: 0, usedDelay: 1000 },
 
   /**
+   * Performs a fast cleanup of tabs that no longer exist in the browser
+   */
+  cleanupStaleTabs: async function() {
+    console.log("[Scanner] Cleaning up stale tabs...");
+    const openTabs = await browser.tabs.query({});
+    const openTabIds = new Set(openTabs.map(t => t.id));
+    const currentMap = window.YTA.State.tabMap;
+    let changed = false;
+
+    for (const tabIdStr in currentMap) {
+      const tabId = parseInt(tabIdStr, 10);
+      if (!openTabIds.has(tabId)) {
+        console.log(`[Scanner] Removing stale tab: ${tabId}`);
+        const entry = currentMap[tabId];
+        if (window.YTA.Core.Logic.isWatchedEnough(entry, window.YTA.State.settings)) {
+          await window.YTA.Shell.Storage.archiveEntry({ ...entry, timestamp: Date.now() });
+        }
+        delete currentMap[tabId];
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      await window.YTA.Shell.Storage.saveTabMap(currentMap);
+      const res = await browser.storage.local.get("historyLog");
+      await window.YTA.Shell.Cache.update(res.historyLog || [], Object.values(currentMap));
+    }
+  },
+
+  /**
    * Performs a full scan of all open YouTube tabs
    */
   refreshTotals: async function() {
     if (this.isScanning) return;
+    
+    // Fast cleanup first
+    await this.cleanupStaleTabs();
+
     this.isScanning = true;
     
     let baseDelay = window.YTA.State.settings.scannerDelay || 1000;

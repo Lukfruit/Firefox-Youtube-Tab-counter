@@ -82,7 +82,9 @@ window.YTA.Popup.Controller = {
     }
 
     // 4. History View
-    const historyTotals = data.historyTotals;
+    const currentRange = window.YTA.Popup.ChartManager.currentRange || 7;
+    const historyTotals = currentRange === 7 ? data.historyTotals7 : data.historyTotals30;
+    
     if (historyTotals) {
       document.getElementById("history-watch").textContent = formatDuration(historyTotals.totalWatch || 0);
       document.getElementById("history-session").textContent = formatDuration(historyTotals.totalSession || 0);
