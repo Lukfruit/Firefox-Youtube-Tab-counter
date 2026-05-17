@@ -11,19 +11,19 @@ This document tracks planned features and UI/UX refinements for the extension.
     - Display full video title.
 
 ## Feature 2: UI Refinement for Refresh Button
-- [ ] Relocate "Refresh & Rescan Tabs" button to the top of the **Live Now** tab.
-- [ ] Position it next to the scanned tabs counter/status text.
-- [ ] Reduce button size and ensure it is in-line with the text for a cleaner look.
+- [x] Relocate "Refresh & Rescan Tabs" button to the top of the **Live Now** tab.
+- [x] Position it next to the scanned tabs counter/status text.
+- [x] Reduce button size and ensure it is in-line with the text for a cleaner look.
 
 ## Feature 3: Scan Persistence Optimization
-- [ ] Implement a "scanned" flag or persistent metadata cache for tabs.
-- [ ] Prevent redundant re-scanning of tabs if metadata (title, channel, tags) is already present in storage.
-- [ ] *Rationale:* YouTube video metadata is static; re-scanning uses unnecessary resources/rate limits.
+- [x] Implement a "scanned" flag or persistent metadata cache for tabs.
+- [x] Prevent redundant re-scanning of tabs if metadata (title, channel, tags) is already present in storage.
+- [x] *Rationale:* YouTube video metadata is static; re-scanning uses unnecessary resources/rate limits.
 
 ## Feature 4: Popup Dimension Adjustments
-- [ ] Increase the height of the extension popup.
-- [ ] *Goal:* Ensure all primary content (stats, status, buttons) is visible without vertical scrolling.
-- [ ] Maintain independent scrolling for the leaderboard area only.
+- [x] Increase the height of the extension popup.
+- [x] *Goal:* Ensure all primary content (stats, status, buttons) is visible without vertical scrolling.
+- [x] Maintain independent scrolling for the leaderboard area only.
 
 ## Feature 5: Leaderboard Expansion
 - [ ] Increase the total number of positions displayed in both the Live and Historical leaderboards.
