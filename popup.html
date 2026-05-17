@@ -27,7 +27,10 @@
   </div>
 
   <div id="view-live" class="view">
-    <div id="status">Idle</div>
+    <div class="status-bar">
+      <div id="status">Idle</div>
+      <button id="refresh" class="btn-small">Rescan</button>
+    </div>
     <h2><span id="total-duration">0:00</span></h2>
     
     <div class="stats-container">
@@ -46,7 +49,6 @@
 
     <div class="leaderboard-header">Top Open Tabs (By Duration)</div>
     <ul id="live-leaderboard" class="leaderboard"></ul>
-    <button id="refresh">Refresh & Rescan Tabs</button>
   </div>
 
   <div id="view-trends" class="view" style="display: none;">
