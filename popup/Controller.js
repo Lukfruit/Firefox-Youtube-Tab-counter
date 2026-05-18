@@ -31,8 +31,7 @@ window.YTA.Popup.Controller = {
     document.getElementById("clear-history").addEventListener("click", (e) => {
       e.preventDefault();
       if (confirm("Clear all historical data?")) {
-        browser.runtime.sendMessage({ type: "forceRefresh" });
-        // Storage clear will trigger refreshUI via onChanged
+        browser.runtime.sendMessage({ type: "clearHistory" });
       }
     });
     

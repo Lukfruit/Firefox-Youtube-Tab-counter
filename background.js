@@ -6,6 +6,11 @@ browser.runtime.onMessage.addListener(async (m, sender) => {
   if (m.type === "forceRefresh") {
     window.YTA.Background.Scanner.refreshTotals();
   }
+
+  if (m.type === "clearHistory") {
+    await window.YTA.Shell.Storage.clearHistory();
+    await window.YTA.Shell.Cache.update([], Object.values(window.YTA.State.tabMap));
+  }
   
   if (m.type === "heartbeat" && sender.tab) {
     window.YTA.Background.Tracker.handleHeartbeat(sender.tab.id, sender.tab.windowId, m.data);
